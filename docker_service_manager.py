@@ -13,10 +13,18 @@ from datetime import datetime
 class DockerServiceManager:
     """Manage Docker daemon and service operations."""
     
-    def __init__(self):
-        """Initialize service manager with system detection."""
+    def __init__(self, demo_mode=False):
+        """Initialize service manager with system detection.
+        
+        Args:
+            demo_mode (bool): If True, enables demo mode with simulated responses
+        """
         self.system = platform.system().lower()
         self.is_admin = self._check_admin_privileges()
+        self.demo_mode = demo_mode
+        
+        if self.demo_mode:
+            print("\033[93m🔍 DEMO MODE ACTIVE: Using simulated Docker responses\033[0m")
         
     def _check_admin_privileges(self):
         """Check if script is running with administrative privileges."""
@@ -348,6 +356,24 @@ class DockerServiceManager:
     
     def list_containers(self):
         """List all Docker containers."""
+        # If in demo mode, show simulated containers
+        if self.demo_mode:
+            print("Connecting to Docker... (Demo Mode)")
+            
+            # Create sample containers for demonstration
+            table_data = [
+                ["abc123", "demo-webserver", "\033[92mrunning\033[0m", "2023-01-01 09:00:00", "nginx:latest"],
+                ["def456", "demo-database", "\033[92mrunning\033[0m", "2023-01-01 09:01:15", "mysql:8.0"],
+                ["ghi789", "demo-redis", "\033[93mrestarting\033[0m", "2023-01-01 09:02:30", "redis:alpine"],
+                ["jkl012", "demo-backup", "\033[91mexited\033[0m", "2023-01-01 09:03:45", "alpine:latest"]
+            ]
+            
+            # Display the table
+            headers = ["ID", "Name", "Status", "Created", "Image"]
+            print(tabulate(table_data, headers=headers, tablefmt="pretty"))
+            return True
+            
+        # Normal mode - try to connect to real Docker
         try:
             print("Connecting to Docker...")
             client = docker.from_env()
@@ -390,6 +416,7 @@ class DockerServiceManager:
         except docker.errors.DockerException as e:
             print(f"Error connecting to Docker: {e}")
             print("Make sure Docker service is running.")
+            print("Or try running with --demo mode for demonstration")
             return False
         except Exception as e:
             print(f"Error listing containers: {e}")
@@ -397,6 +424,45 @@ class DockerServiceManager:
     
     def check_docker_info(self):
         """Get Docker system info."""
+        # If in demo mode, show simulated Docker info
+        if self.demo_mode:
+            print("Connecting to Docker... (Demo Mode)")
+            
+            # Prepare demo data for basic info
+            basic_info = [
+                ["Docker Version", "20.10.12"],
+                ["OS/Arch", "Linux/x86_64"],
+                ["Kernel Version", "5.4.0-81-generic"],
+                ["Containers", "4"],
+                ["Images", "12"],
+                ["CPUs", "8"],
+                ["Memory", "16.00 GB"]
+            ]
+            
+            print("\n=== Docker System Information (Demo Mode) ===")
+            print(tabulate(basic_info, tablefmt="plain"))
+            
+            # Print storage driver info
+            print("\n=== Storage Driver ===")
+            driver_info = [
+                ["Driver", "overlay2"],
+                ["Root Dir", "/var/lib/docker"]
+            ]
+            print(tabulate(driver_info, tablefmt="plain"))
+            
+            # Print networking info
+            print("\n=== Network ===")
+            net_info = [
+                ["bridge", "Bridge network driver"],
+                ["host", "Host network driver"],
+                ["overlay", "Overlay network driver"],
+                ["macvlan", "Macvlan network driver"]
+            ]
+            print(tabulate(net_info, tablefmt="plain"))
+            
+            return True
+            
+        # Normal mode - try to connect to real Docker
         try:
             print("Connecting to Docker...")
             client = docker.from_env()
@@ -435,6 +501,7 @@ class DockerServiceManager:
         except docker.errors.DockerException as e:
             print(f"Error connecting to Docker: {e}")
             print("Make sure Docker service is running.")
+            print("Or try running with --demo mode for demonstration")
             return False
         except Exception as e:
             print(f"Error getting Docker info: {e}")
@@ -459,6 +526,10 @@ def setup_argparse():
         description="Cross-platform Docker service management tool", 
         formatter_class=argparse.RawTextHelpFormatter
     )
+    
+    # Add the demo mode flag (global flag for all commands)
+    parser.add_argument('--demo', action='store_true', 
+                      help='Enable demo mode with simulated Docker responses')
     
     # Create subparsers for different command groups
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -554,8 +625,14 @@ def main():
     parser = setup_argparse()
     args = parser.parse_args()
     
-    # Initialize the Docker service manager
-    manager = DockerServiceManager()
+    # Initialize the Docker service manager (with demo mode if specified)
+    demo_mode = args.demo if hasattr(args, 'demo') else False
+    
+    # Show demo mode indicator if active
+    if demo_mode:
+        print("\033[93m🔍 DEMO MODE ACTIVE: Using simulated Docker responses\033[0m")
+        
+    manager = DockerServiceManager(demo_mode=demo_mode)
     
     # Check if no command was provided
     if not hasattr(args, 'command') or args.command is None:
