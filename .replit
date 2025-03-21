@@ -65,5 +65,14 @@ task = "packager.installForAll"
 task = "shell.exec"
 args = "python docker_service_manager.py --tui --demo"
 
+[[workflows.workflow]]
+name = "Run Tests"
+author = 18984519
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m unittest discover tests/"
+
 [deployment]
 run = ["sh", "-c", "python docker_service_manager.py --interactive --demo"]
