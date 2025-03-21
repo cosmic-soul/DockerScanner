@@ -17,6 +17,9 @@ A cross-platform Python CLI tool for managing Docker daemon services on Linux, m
 - Quick launch templates for common development environments
 - Modular, extensible architecture
 - Contextual onboarding for new users
+- One-click system health reports with detailed metrics
+- Visual performance and resource monitoring with ASCII graphs
+- Health report recommendations based on system status
 
 ## Requirements
 
@@ -48,6 +51,7 @@ python docker_service_manager.py [command] [action]
 - `template`: Manage development environment templates (list, create, launch)
 - `info`: Display Docker system information
 - `version`: Show tool version
+- `health`: Generate a comprehensive system health report
 
 ### Demo Mode
 

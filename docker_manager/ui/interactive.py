@@ -7,6 +7,7 @@ import time
 from typing import List, Dict, Callable, Any, Optional
 
 from ..core.service_manager import DockerServiceManager
+from ..core.health_report import HealthReport
 from ..templates.environment_templates import TemplateManager
 from ..utils.display import COLORS, get_terminal_size, show_banner, print_status, print_section
 from .onboarding import OnboardingManager
@@ -43,6 +44,7 @@ class InteractiveConsole:
                     {"key": "3", "desc": "Container Management", "action": lambda: self._change_menu("container")},
                     {"key": "4", "desc": "Templates", "action": lambda: self._change_menu("templates")},
                     {"key": "5", "desc": "System Information", "action": lambda: self._change_menu("info")},
+                    {"key": "6", "desc": "Generate Health Report", "action": self._generate_health_report},
                     {"key": "q", "desc": "Quit", "action": self._quit}
                 ]
             },
@@ -82,6 +84,8 @@ class InteractiveConsole:
                 "options": [
                     {"key": "1", "desc": "Show Docker Info", "action": self._show_docker_info},
                     {"key": "2", "desc": "Check Admin Privileges", "action": self._check_privileges},
+                    {"key": "3", "desc": "Generate Health Report", "action": self._generate_health_report},
+                    {"key": "4", "desc": "Save Health Report", "action": self._save_health_report},
                     {"key": "b", "desc": "Back to Main Menu", "action": lambda: self._change_menu("main")}
                 ]
             },
@@ -446,6 +450,58 @@ class InteractiveConsole:
             print_status("Environment launched successfully", "ok", demo_mode=self.demo_mode)
         else:
             print_status("Failed to launch environment", "error", demo_mode=self.demo_mode)
+            
+        input("\nPress Enter to continue...")
+        
+    # Health report actions
+    def _generate_health_report(self) -> None:
+        """Generate and display a comprehensive system health report."""
+        print_section("Docker System Health Report")
+        
+        # Initialize health report
+        health_report = HealthReport(demo_mode=self.demo_mode)
+        
+        # Generate and display the report
+        print("Generating comprehensive system health report...")
+        print("This may take a few seconds...")
+        print()
+        
+        # Track usage for onboarding system
+        self.onboarding.maybe_show_suggestion("info", "health_report")
+        
+        # Generate the report - this handles displaying as well
+        success = health_report.generate_report()
+        
+        # Store report instance for potential saving
+        self._last_health_report = health_report
+        
+        input("\nPress Enter to continue...")
+        
+    def _save_health_report(self) -> None:
+        """Save the last generated health report to a file."""
+        print_section("Save Health Report")
+        
+        # Check if a report has been generated
+        if not hasattr(self, '_last_health_report'):
+            print("No health report has been generated yet.")
+            print("Please generate a health report first.")
+            input("\nPress Enter to continue...")
+            return
+            
+        # Ask for filename
+        default_filename = f"docker_health_report_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        filename = input(f"Enter filename (default: {default_filename}): ")
+        if not filename:
+            filename = default_filename
+        
+        # Save the report
+        print(f"\nSaving health report to {filename}...")
+        saved_file = self._last_health_report.save_report(filename)
+        
+        if saved_file:
+            print_status(f"Health report saved to {saved_file}", "ok", demo_mode=self.demo_mode)
+        else:
+            print_status("Failed to save health report", "error", demo_mode=self.demo_mode)
             
         input("\nPress Enter to continue...")
     

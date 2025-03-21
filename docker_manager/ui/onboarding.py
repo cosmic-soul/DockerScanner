@@ -314,6 +314,8 @@ class OnboardingManager:
         print("Available commands:")
         print("- info: Show Docker system information")
         print("- privileges: Check if you have administrative privileges")
+        print("- health report: Generate a comprehensive system health report")
+        print("- save report: Save the last generated health report to a file")
         
         input("Press Enter to continue...")
     
@@ -339,6 +341,23 @@ class OnboardingManager:
         print("- Sample data is displayed for containers and system information")
         print()
         print("To exit demo mode, restart the application without the --demo flag.")
+        
+        input("Press Enter to continue...")
+        
+    def _show_health_report_help(self) -> None:
+        """Show help for the health report feature."""
+        print_section("System Health Report")
+        print("The Health Report provides a comprehensive overview of your system and Docker environment.")
+        print()
+        print("Health Report features:")
+        print("- Real-time CPU, memory, and disk usage metrics")
+        print("- Docker daemon status and performance")
+        print("- Container resource utilization")
+        print("- Visual charts for key performance indicators")
+        print("- Actionable recommendations based on system state")
+        print()
+        print("You can generate a report at any time from the main menu or system information section.")
+        print("Reports can be saved as JSON files for later reference or sharing with support teams.")
         
         input("Press Enter to continue...")
         
@@ -420,9 +439,10 @@ class OnboardingManager:
             print("5 - System Information")
             print("6 - Administrative Privileges")
             print("7 - Demo Mode")
+            print("8 - System Health Report")
             print("0 - Return to previous menu")
             
-            choice = input("Select a topic (0-7): ").strip()
+            choice = input("Select a topic (0-8): ").strip()
             
             if choice == "0":
                 break
@@ -440,6 +460,8 @@ class OnboardingManager:
                 self._show_privileges_help()
             elif choice == "7":
                 self._show_demo_mode_help()
+            elif choice == "8":
+                self._show_health_report_help()
             else:
                 print_status("Invalid selection", "error")
                 
@@ -530,6 +552,14 @@ class OnboardingManager:
             "check_privileges": (
                 not self.is_topic_completed("privileges"),
                 "Tip: Many Docker operations require administrative privileges."
+            ),
+            "health_report": (
+                not self.is_topic_completed("system"),
+                "Tip: Health reports provide detailed performance metrics and resource usage."
+            ),
+            "save_report": (
+                not self.is_topic_completed("system"),
+                "Tip: Save reports to track system health over time or for troubleshooting."
             )
         }
         

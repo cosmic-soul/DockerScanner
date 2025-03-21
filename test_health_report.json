@@ -1,0 +1,92 @@
+{
+  "timestamp": "2025-03-21T10:38:51.611861",
+  "system": {
+    "os": "Linux",
+    "platform": "Linux-6.2.16-x86_64-with-glibc2.40",
+    "python": "3.11.10",
+    "hostname": "4517ee2b9bee",
+    "cpu": {
+      "percent": 45.2,
+      "count": 8,
+      "per_cpu": [
+        35.1,
+        62.3,
+        41.8,
+        50.2,
+        38.7,
+        52.1,
+        47.5,
+        33.9
+      ]
+    },
+    "memory": {
+      "total": 16.0,
+      "available": 8.5,
+      "percent": 46.9,
+      "used": 7.5,
+      "cached": 4.2
+    },
+    "disk": {
+      "total": 512.0,
+      "used": 256.0,
+      "free": 256.0,
+      "percent": 50.0
+    },
+    "network": {
+      "bytes_sent": 2500000,
+      "bytes_recv": 8500000,
+      "packets_sent": 25000,
+      "packets_recv": 42000
+    }
+  },
+  "docker": {
+    "status": "running",
+    "version": "24.0.5",
+    "containers": {
+      "total": 5,
+      "running": 3,
+      "paused": 0,
+      "stopped": 2,
+      "containers": [
+        {
+          "id": "demo1",
+          "name": "web-server",
+          "image": "nginx",
+          "status": "running",
+          "cpu_percent": 1.5,
+          "memory_usage": "10MiB",
+          "memory_percent": 1.0,
+          "network_io": "10MB/20MB",
+          "block_io": "5MB/10MB",
+          "pids": 10
+        },
+        {
+          "id": "demo2",
+          "name": "database",
+          "image": "postgres",
+          "status": "running",
+          "cpu_percent": 3.2,
+          "memory_usage": "200MiB",
+          "memory_percent": 20.0,
+          "network_io": "5MB/2MB",
+          "block_io": "15MB/5MB",
+          "pids": 5
+        },
+        {
+          "id": "demo3",
+          "name": "cache",
+          "image": "redis",
+          "status": "running",
+          "cpu_percent": 0.8,
+          "memory_usage": "50MiB",
+          "memory_percent": 5.0,
+          "network_io": "2MB/1MB",
+          "block_io": "1MB/5MB",
+          "pids": 3
+        }
+      ]
+    },
+    "errors": null
+  },
+  "recommendations": []
+}

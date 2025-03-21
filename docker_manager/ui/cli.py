@@ -7,6 +7,7 @@ import os
 from typing import List, Dict, Optional, Any
 
 from ..core.service_manager import DockerServiceManager
+from ..core.health_report import HealthReport
 from ..templates.environment_templates import TemplateManager
 from ..utils.display import show_banner
 from .. import __version__
@@ -79,6 +80,9 @@ def setup_argparse() -> argparse.ArgumentParser:
     
     # System information subcommand
     info_parser = subparsers.add_parser('info', help='Show Docker system information')
+    
+    # Health report subcommand
+    health_parser = subparsers.add_parser('health', help='Generate system health report with visual metrics')
     
     # Version command
     version_parser = subparsers.add_parser('version', help='Show Docker Manager version')
@@ -175,6 +179,10 @@ def process_args(args: argparse.Namespace) -> int:
     
     elif args.command == 'info':
         success = manager.check_docker_info()
+    
+    elif args.command == 'health':
+        health_reporter = HealthReport(demo_mode=args.demo)
+        success = health_reporter.generate_report()
     
     elif args.command == 'template':
         # Create template manager instance
