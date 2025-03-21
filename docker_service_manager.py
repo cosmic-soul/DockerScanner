@@ -170,6 +170,18 @@ class DockerServiceManager:
     def get_status(self):
         """Get Docker service status."""
         print("Checking Docker service status...")
+        
+        # If in demo mode, show simulated service status
+        if self.demo_mode:
+            print("\033[93mDEMO MODE\033[0m: Simulating Docker service status")
+            print("Docker service is \033[92mrunning\033[0m")
+            print("Status: Active")
+            print("Docker version: 20.10.12")
+            print("Containers: 4 (3 Running, 1 Stopped)")
+            print("Images: 12")
+            return True
+            
+        # Normal mode
         if not self.check_privileges():
             print("Attempting to check status anyway...")
             
@@ -181,12 +193,23 @@ class DockerServiceManager:
             print(output)
         else:
             print(f"Error checking Docker service status: {output}")
+            print("You can use --demo mode to see simulated output")
             
         return success
         
     def start_service(self):
         """Start Docker service."""
         print("Starting Docker service...")
+        
+        # If in demo mode, simulate starting the service
+        if self.demo_mode:
+            print("\033[93mDEMO MODE\033[0m: Simulating Docker service start")
+            print("✓ Docker service started successfully")
+            time.sleep(1)  # Simulate startup time
+            self.get_status()  # Will show demo status
+            return True
+            
+        # Normal mode
         if not self.check_privileges():
             print("Attempting to start service anyway...")
             
@@ -200,12 +223,22 @@ class DockerServiceManager:
             self.get_status()
         else:
             print(f"Error starting Docker service: {output}")
+            print("You can use --demo mode to see simulated output")
             
         return success
         
     def stop_service(self):
         """Stop Docker service."""
         print("Stopping Docker service...")
+        
+        # If in demo mode, simulate stopping the service
+        if self.demo_mode:
+            print("\033[93mDEMO MODE\033[0m: Simulating Docker service stop")
+            time.sleep(1)  # Simulate shutdown time
+            print("✓ Docker service stopped successfully")
+            return True
+        
+        # Normal mode
         if not self.check_privileges():
             print("Attempting to stop service anyway...")
             
@@ -216,6 +249,7 @@ class DockerServiceManager:
             print("✓ Docker service stopped successfully")
         else:
             print(f"Error stopping Docker service: {output}")
+            print("You can use --demo mode to see simulated output")
             
         return success
         
