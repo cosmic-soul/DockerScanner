@@ -13,6 +13,9 @@ A cross-platform Python CLI tool for managing Docker daemon services on Linux, m
 - Administrative privilege validation
 - Clear console output with status messages
 - Demo mode for testing in environments without Docker
+- Interactive menu-based interface for easier use
+- Quick launch templates for common development environments
+- Modular, extensible architecture
 
 ## Requirements
 
@@ -41,6 +44,7 @@ python docker_service_manager.py [command] [action]
 - `service`: Manage Docker service (start, stop, restart, status, enable, disable)
 - `socket`: Manage Docker socket (start, stop, status, enable, disable)
 - `containers`: List Docker containers
+- `template`: Manage development environment templates (list, create, launch)
 - `info`: Display Docker system information
 - `version`: Show tool version
 
@@ -57,6 +61,22 @@ This is useful for:
 - Training or demonstration purposes
 - Development testing without affecting a real Docker installation
 
+### Interactive Mode
+
+Run the tool in interactive mode for a menu-based interface:
+
+```bash
+python docker_service_manager.py --interactive
+# or
+python docker_service_manager.py -i
+```
+
+You can also use demo mode with interactive mode:
+
+```bash
+python docker_service_manager.py --interactive --demo
+```
+
 ### Examples
 
 Check Docker service status:
@@ -72,4 +92,113 @@ python docker_service_manager.py --demo containers
 View system information in demo mode:
 ```bash
 python docker_service_manager.py --demo info
+```
+
+List available templates in demo mode:
+```bash
+python docker_service_manager.py --demo template list
+```
+
+Create a LAMP stack environment:
+```bash
+python docker_service_manager.py --demo template create lamp --directory ~/docker-environments/lamp
+```
+
+Launch a WordPress environment:
+```bash
+python docker_service_manager.py --demo template launch wordpress --directory ~/docker-environments/wordpress
+```
+
+### Development Templates
+
+The tool includes predefined templates for common development environments:
+
+- **LAMP Stack**: Linux, Apache, MySQL, PHP
+  - Web server (PHP 7.4 with Apache)
+  - MySQL 5.7 database
+  - PHPMyAdmin for database management
+
+- **MEAN Stack**: MongoDB, Express, Angular, Node.js
+  - Node.js backend (Express.js)
+  - Angular frontend
+  - MongoDB database
+
+- **WordPress**: Complete WordPress development environment
+  - WordPress latest version
+  - MySQL 5.7 database
+  - PHPMyAdmin for database management
+
+All templates include:
+- Docker Compose configuration
+- Persistent volumes for data
+- Demo index pages and README files
+- Port mappings for easy local access
+
+## Project Structure
+
+The project has been refactored into a modular structure:
+
+```
+docker_manager/
+├── __init__.py             # Package initialization
+├── core/                   # Core functionality
+│   ├── __init__.py
+│   ├── service_manager.py  # Main service manager class
+│   └── container_logs.py   # Container logs functionality
+├── ui/                     # User interface components
+│   ├── __init__.py
+│   ├── cli.py              # Command-line interface
+│   └── interactive.py      # Interactive console UI
+├── utils/                  # Utility functions
+│   ├── __init__.py
+│   ├── display.py          # Display and formatting utilities
+│   └── system.py           # System-related utilities
+└── templates/              # Templates and extensions
+    ├── __init__.py
+    ├── command_template.py # Template for adding new commands
+    └── environment_templates.py # Development environment templates
+```
+
+## Extending the Tool
+
+### Adding New Commands
+
+You can extend the tool with new commands by:
+
+1. Creating a new command module based on the template in `docker_manager/templates/command_template.py`
+2. Adding the command to the CLI parser in `docker_manager/ui/cli.py`
+3. Adding a menu entry in the interactive console in `docker_manager/ui/interactive.py`
+
+### Adding Custom Development Templates
+
+You can add your own development environment templates:
+
+1. Create a new template class in `docker_manager/templates/environment_templates.py` by extending the `EnvironmentTemplate` base class
+2. Define your Docker Compose configuration and any additional files needed
+3. Register your template in the `TemplateManager._register_templates()` method
+4. Your template will automatically be available in both CLI and interactive modes
+
+Example for creating a new template:
+
+```python
+class RubyOnRailsTemplate(EnvironmentTemplate):
+    """Ruby on Rails development environment template."""
+    
+    def __init__(self, demo_mode: bool = False):
+        """Initialize Rails template."""
+        super().__init__(
+            name="Ruby on Rails",
+            description="Ruby on Rails with PostgreSQL",
+            demo_mode=demo_mode
+        )
+        
+        # Define template files
+        self.files = {
+            "docker-compose.yml": """version: '3'
+# Your Docker Compose configuration here
+""",
+            "README.md": """# Ruby on Rails Environment
+# Documentation for your template
+"""
+        }
 ```
