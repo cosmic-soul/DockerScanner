@@ -74,5 +74,22 @@ mode = "sequential"
 task = "shell.exec"
 args = "python -m unittest discover tests/"
 
+[[workflows.workflow]]
+name = "Full Test Suite"
+author = 18984519
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m unittest discover tests/"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flake8 docker_manager/"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "mypy docker_manager/"
+
 [deployment]
 run = ["sh", "-c", "python docker_service_manager.py --interactive --demo"]

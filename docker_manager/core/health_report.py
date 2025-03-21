@@ -78,12 +78,32 @@ class HealthReport:
         except Exception as e:
             return False, str(e)
     
+    def __init__(self, demo_mode: bool = False, cache_timeout: int = 60):
+        """Initialize health report generator.
+        
+        Args:
+            demo_mode: Whether to use demo mode with simulated responses
+            cache_timeout: How long to cache metrics for in seconds
+        """
+        self.demo_mode = demo_mode
+        self.cache_timeout = cache_timeout
+        self.metrics_cache = {}
+        self.metrics_timestamp = 0
+        self.report_data = {}
+        self.chart_files = []
+        self.temp_dir = tempfile.mkdtemp(prefix='docker_manager_report_')
+
     def _get_system_metrics(self) -> Dict[str, Any]:
-        """Collect system performance metrics.
+        """Collect system performance metrics with caching.
         
         Returns:
             Dictionary of system metrics
         """
+        current_time = time.time()
+        if (current_time - self.metrics_timestamp) < self.cache_timeout and self.metrics_cache:
+            return self.metrics_cache.copy()
+            
+        self.metrics_timestamp = current_time
         if self.demo_mode:
             # Generate realistic demo data
             return {
