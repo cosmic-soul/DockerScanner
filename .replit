@@ -45,7 +45,7 @@ task = "packager.installForAll"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python docker_service_manager.py --demo service status"
+args = "python docker_service_manager.py --interactive --demo"
 
 [deployment]
 run = ["sh", "-c", "python docker_service_manager.py --interactive --demo"]

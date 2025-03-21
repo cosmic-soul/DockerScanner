@@ -194,8 +194,12 @@ class DockerServiceManager:
             return False
         return True
     
-    def get_status(self) -> bool:
-        """Get Docker service status."""
+    def get_status(self) -> Tuple[bool, Optional[str]]:
+        """Get Docker service status.
+        
+        Returns:
+            Tuple of (success, error_code) where error_code is None on success
+        """
         print("Checking Docker service status...")
         
         # If in demo mode, show simulated service status
@@ -206,7 +210,7 @@ class DockerServiceManager:
             print("Docker version: 20.10.12")
             print("Containers: 4 (3 Running, 1 Stopped)")
             print("Images: 12")
-            return True
+            return True, None
             
         # Normal mode
         if not self.check_privileges():
@@ -218,11 +222,24 @@ class DockerServiceManager:
         if success:
             print("Docker service status:")
             print(output)
+            
+            # Check if service is actually running
+            if self.system == 'linux' and 'active' not in output.lower():
+                return False, "service_not_running" 
+            elif self.system == 'darwin' and not any(status in output.lower() for status in ['running', 'active']):
+                return False, "service_not_running"
+            elif self.system == 'windows' and 'running' not in output.lower():
+                return False, "service_not_running"
+                
+            return True, None
         else:
             print(f"Error checking Docker service status: {output}")
             print("You can use --demo mode to see simulated output")
             
-        return success
+            if 'permission denied' in output.lower() or 'access is denied' in output.lower():
+                return False, "permission_denied"
+            
+            return False, "docker_not_installed"
         
     def start_service(self) -> bool:
         """Start Docker service."""
@@ -362,8 +379,12 @@ class DockerServiceManager:
             
         return success
     
-    def get_socket_status(self) -> bool:
-        """Get Docker socket status."""
+    def get_socket_status(self) -> Tuple[bool, Optional[str]]:
+        """Get Docker socket status.
+        
+        Returns:
+            Tuple of (success, error_code) where error_code is None on success
+        """
         print("Checking Docker socket status...")
         
         # If in demo mode, simulate socket status
@@ -371,7 +392,7 @@ class DockerServiceManager:
             print("\033[93mDEMO MODE\033[0m: Simulating Docker socket status")
             print("Docker socket is \033[92mactive\033[0m")
             print("Socket listening at: /var/run/docker.sock")
-            return True
+            return True, None
             
         # Normal mode
         if not self.check_privileges():
@@ -383,11 +404,20 @@ class DockerServiceManager:
         if success:
             print("Docker socket status:")
             print(output)
+            
+            # Check if socket is actually available
+            if self.system == 'linux' and 'active' not in output.lower():
+                return False, "socket_not_available"
+                
+            return True, None
         else:
             print(f"Error checking Docker socket status: {output}")
             print("You can use --demo mode to see simulated output")
             
-        return success
+            if 'permission denied' in output.lower() or 'access is denied' in output.lower():
+                return False, "permission_denied"
+            
+            return False, "socket_not_available"
     
     def start_socket(self) -> bool:
         """Start Docker socket."""
@@ -497,8 +527,12 @@ class DockerServiceManager:
             
         return success
     
-    def list_containers(self) -> bool:
-        """List all Docker containers."""
+    def list_containers(self) -> Tuple[bool, Optional[str]]:
+        """List all Docker containers.
+        
+        Returns:
+            Tuple of (success, error_code) where error_code is None on success
+        """
         # If in demo mode, show simulated containers
         if self.demo_mode:
             print("Connecting to Docker... (Demo Mode)")
@@ -521,14 +555,14 @@ class DockerServiceManager:
                 for row in table_data:
                     print(" | ".join(row))
                     
-            return True
+            return True, None
             
         # Normal mode - try to connect to real Docker
         if not DOCKER_AVAILABLE:
             print("Error: Docker Python SDK not installed.")
             print("Install with: pip install docker")
             print("Or run with --demo mode to see simulated output")
-            return False
+            return False, "docker_not_installed"
             
         try:
             print("Connecting to Docker...")
@@ -537,7 +571,7 @@ class DockerServiceManager:
             
             if not containers:
                 print("No containers found.")
-                return True
+                return True, None
             
             # Prepare table data
             table_data = []
@@ -574,18 +608,27 @@ class DockerServiceManager:
                 for row in table_data:
                     print(" | ".join(row))
             
-            return True
+            return True, None
         except DockerException as e:
             print(f"Error connecting to Docker: {e}")
             print("Make sure Docker service is running.")
             print("Or try running with --demo mode for demonstration")
-            return False
+            
+            # Check if the error indicates service not running
+            if "connect to the Docker daemon" in str(e) or "Is the docker daemon running" in str(e):
+                return False, "service_not_running"
+                
+            return False, "docker_not_installed"
         except Exception as e:
             print(f"Error listing containers: {e}")
-            return False
+            return False, None
     
-    def check_docker_info(self) -> bool:
-        """Get Docker system info."""
+    def check_docker_info(self) -> Tuple[bool, Optional[str]]:
+        """Get Docker system info.
+        
+        Returns:
+            Tuple of (success, error_code) where error_code is None on success
+        """
         # If in demo mode, show simulated Docker info
         if self.demo_mode:
             print("Connecting to Docker... (Demo Mode)")
@@ -634,14 +677,14 @@ class DockerServiceManager:
                 for key, value in net_info:
                     print(f"{key}: {value}")
             
-            return True
+            return True, None
             
         # Normal mode - try to connect to real Docker
         if not DOCKER_AVAILABLE:
             print("Error: Docker Python SDK not installed.")
             print("Install with: pip install docker")
             print("Or run with --demo mode to see simulated output")
-            return False
+            return False, "docker_not_installed"
             
         try:
             print("Connecting to Docker...")
@@ -690,12 +733,17 @@ class DockerServiceManager:
                 for name, details in net_info:
                     print(f"{name}: {details}")
             
-            return True
+            return True, None
         except DockerException as e:
             print(f"Error connecting to Docker: {e}")
             print("Make sure Docker service is running.")
             print("Or try running with --demo mode for demonstration")
-            return False
+            
+            # Check if the error indicates service not running
+            if "connect to the Docker daemon" in str(e) or "Is the docker daemon running" in str(e):
+                return False, "service_not_running"
+                
+            return False, "docker_not_installed"
         except Exception as e:
             print(f"Error getting Docker info: {e}")
-            return False
+            return False, None

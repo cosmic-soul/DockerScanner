@@ -9,6 +9,7 @@ from typing import List, Dict, Callable, Any, Optional
 from ..core.service_manager import DockerServiceManager
 from ..templates.environment_templates import TemplateManager
 from ..utils.display import COLORS, get_terminal_size, show_banner, print_status, print_section
+from .onboarding import OnboardingManager
 
 class InteractiveConsole:
     """Interactive console interface for Docker service management."""
@@ -21,6 +22,7 @@ class InteractiveConsole:
         """
         self.manager = DockerServiceManager(demo_mode=demo_mode)
         self.template_manager = TemplateManager(demo_mode=demo_mode)
+        self.onboarding = OnboardingManager(demo_mode=demo_mode)
         self.demo_mode = demo_mode
         self.running = True
         self.current_menu = "main"
@@ -106,6 +108,9 @@ class InteractiveConsole:
         """
         if menu_name in self.menus:
             self.current_menu = menu_name
+            
+            # Show first-time section help for this menu
+            self.onboarding.show_first_time_section_help(menu_name)
         else:
             print(f"Error: Menu '{menu_name}' not found")
             input("Press Enter to continue...")
@@ -126,6 +131,14 @@ class InteractiveConsole:
         for option in menu["options"]:
             print(f"{COLORS['CYAN']}{option['key']}{COLORS['RESET']} - {option['desc']}")
             
+        # Add back option if not in main menu
+        if self.current_menu != "main":
+            print(f"{COLORS['CYAN']}b{COLORS['RESET']} - Back to Main Menu")
+            
+        # Add help indicators at the bottom
+        print(f"\n{COLORS['CYAN']}?{COLORS['RESET']} - Show help for this menu")
+        print(f"{COLORS['CYAN']}h{COLORS['RESET']} - Browse all help topics")
+            
     def _get_input(self) -> str:
         """Get user input for menu selection.
         
@@ -134,10 +147,29 @@ class InteractiveConsole:
         """
         valid_keys = [option["key"] for option in self.menus[self.current_menu]["options"]]
         
+        # Add help keys
+        valid_keys.extend(['?', 'h'])
+        
+        # Add back option if not in main menu
+        if self.current_menu != "main":
+            valid_keys.append('b')
+        
         while True:
-            choice = input(f"\n{COLORS['BOLD']}Select an option:{COLORS['RESET']} ").lower()
+            choice = input(f"\n{COLORS['BOLD']}Select an option (? for help):{COLORS['RESET']} ").lower()
+            
+            # Handle help commands
+            if choice == '?':
+                self.onboarding.show_contextual_help(self.current_menu)
+                self._display_menu()
+                continue
+            elif choice == 'h':
+                self.onboarding.show_all_help_topics()
+                self._display_menu()
+                continue
+                
             if choice in valid_keys:
                 return choice
+                
             print(f"{COLORS['RED']}Invalid option. Please try again.{COLORS['RESET']}")
             
     def _process_action(self, choice: str) -> None:
@@ -146,6 +178,21 @@ class InteractiveConsole:
         Args:
             choice: User's menu selection
         """
+        # Handle help commands
+        if choice == '?':
+            self.onboarding.show_contextual_help(self.current_menu)
+            return
+            
+        if choice == 'h':
+            self.onboarding.show_all_help_topics()
+            return
+            
+        # Handle back command
+        if choice == 'b' and self.current_menu != "main":
+            self.current_menu = "main"
+            return
+        
+        # Handle regular menu options
         for option in self.menus[self.current_menu]["options"]:
             if option["key"] == choice:
                 option["action"]()
@@ -156,17 +203,22 @@ class InteractiveConsole:
         self.running = False
         print("\nThank you for using Docker Service Manager!")
         
-    def _handle_action_result(self, success: bool, action_name: str) -> None:
+    def _handle_action_result(self, success: bool, action_name: str, error_code: Optional[str] = None) -> None:
         """Handle the result of an action, showing appropriate messages.
         
         Args:
             success: Whether the action was successful
             action_name: Name of the action performed
+            error_code: Optional error code for showing contextual help
         """
         if success:
             print_status(f"{action_name} completed successfully", "ok", demo_mode=self.demo_mode)
         else:
             print_status(f"{action_name} failed", "error", demo_mode=self.demo_mode)
+            
+            # Show contextual error help if an error code is provided
+            if error_code:
+                self.onboarding.show_error_help(error_code)
             
         input("\nPress Enter to continue...")
         
@@ -174,7 +226,15 @@ class InteractiveConsole:
     def _check_service_status(self) -> None:
         """Check Docker service status."""
         print_section("Docker Service Status")
-        success = self.manager.get_status()
+        success, error_code = self.manager.get_status()
+        
+        # Track usage for onboarding system
+        self.onboarding.maybe_show_suggestion("service", "status")
+        
+        # Show error help if there's an error
+        if not success and error_code:
+            self.onboarding.show_error_help(error_code)
+        
         input("\nPress Enter to continue...")
         
     def _start_service(self) -> None:
@@ -211,7 +271,15 @@ class InteractiveConsole:
     def _check_socket_status(self) -> None:
         """Check Docker socket status."""
         print_section("Docker Socket Status")
-        success = self.manager.get_socket_status()
+        success, error_code = self.manager.get_socket_status()
+        
+        # Track usage for onboarding system
+        self.onboarding.maybe_show_suggestion("socket", "status")
+        
+        # Show error help if there's an error
+        if not success and error_code:
+            self.onboarding.show_error_help(error_code)
+            
         input("\nPress Enter to continue...")
         
     def _start_socket(self) -> None:
@@ -242,7 +310,15 @@ class InteractiveConsole:
     def _list_containers(self) -> None:
         """List Docker containers."""
         print_section("Docker Containers")
-        success = self.manager.list_containers()
+        success, error_code = self.manager.list_containers()
+        
+        # Track usage for onboarding system
+        self.onboarding.maybe_show_suggestion("container", "list")
+        
+        # Show error help if there's an error
+        if not success and error_code:
+            self.onboarding.show_error_help(error_code)
+            
         input("\nPress Enter to continue...")
         
     def _view_container_logs(self) -> None:
@@ -286,7 +362,15 @@ class InteractiveConsole:
     def _show_docker_info(self) -> None:
         """Show Docker system information."""
         print_section("Docker System Information")
-        success = self.manager.check_docker_info()
+        success, error_code = self.manager.check_docker_info()
+        
+        # Track usage for onboarding system
+        self.onboarding.maybe_show_suggestion("info", "docker")
+        
+        # Show error help if there's an error
+        if not success and error_code:
+            self.onboarding.show_error_help(error_code)
+            
         input("\nPress Enter to continue...")
         
     def _check_privileges(self) -> None:
@@ -367,7 +451,42 @@ class InteractiveConsole:
     
     def run(self) -> None:
         """Main loop for interactive console."""
+        # Show welcome message for first-time users
+        self.onboarding.show_welcome()
+        
+        # First-time help for main menu if applicable
+        self.onboarding.show_first_time_section_help("main")
+        
         while self.running:
             self._display_menu()
             choice = self._get_input()
+            
+            # Skip suggestions for navigation actions
+            if choice not in ['q', 'b', '?', 'h']:
+                # Extract the action name from the menu option
+                action = None
+                for option in self.menus[self.current_menu]["options"]:
+                    if option["key"] == choice:
+                        # Convert "Check Service Status" to "check_service_status"
+                        action = option["desc"].lower().replace(" ", "_")
+                        
+                        # Mark topic as viewed if we're showing help for it
+                        if self.current_menu == "service":
+                            self.onboarding.mark_topic_completed("service")
+                        elif self.current_menu == "socket":
+                            self.onboarding.mark_topic_completed("socket")
+                        elif self.current_menu == "container":
+                            self.onboarding.mark_topic_completed("containers")
+                        elif self.current_menu == "templates":
+                            self.onboarding.mark_topic_completed("templates")
+                        elif self.current_menu == "info":
+                            self.onboarding.mark_topic_completed("system")
+                        
+                        break
+                        
+                # Only show suggestions for actual actions (not navigation)
+                if action:
+                    self.onboarding.maybe_show_suggestion(self.current_menu, action)
+            
+            # Process the selected action
             self._process_action(choice)

@@ -16,6 +16,7 @@ A cross-platform Python CLI tool for managing Docker daemon services on Linux, m
 - Interactive menu-based interface for easier use
 - Quick launch templates for common development environments
 - Modular, extensible architecture
+- Contextual onboarding for new users
 
 ## Requirements
 
@@ -76,6 +77,20 @@ You can also use demo mode with interactive mode:
 ```bash
 python docker_service_manager.py --interactive --demo
 ```
+
+#### Contextual Onboarding
+
+The interactive mode includes an enhanced contextual onboarding system for new users:
+
+- **Welcome Screen**: First-time users see a detailed welcome message with key features, navigation tips, and demo mode information
+- **First-Time Section Guidance**: When you navigate to a new section for the first time, you'll receive a brief explanation of what that section does and recommended first steps
+- **Contextual Help**: Press `?` at any menu to get detailed context-specific help about available commands and options
+- **Complete Help Directory**: Press `h` to browse all available help topics through an interactive menu
+- **Adaptive Contextual Tips**: Smart suggestions appear based on your current menu and actions - these suggestions evolve as you gain experience
+- **Action-Specific Guidance**: Specific tips appear after taking actions to suggest logical next steps
+- **Progress Tracking**: The system remembers which help topics you've already explored so you don't see redundant information
+
+The onboarding system stores a minimal user profile in ~/.docker_manager/config.json to track your progress, ensuring help is available when needed without becoming intrusive as you gain familiarity with the tool.
 
 ### Examples
 
@@ -148,7 +163,11 @@ docker_manager/
 ├── ui/                     # User interface components
 │   ├── __init__.py
 │   ├── cli.py              # Command-line interface
-│   └── interactive.py      # Interactive console UI
+│   ├── interactive.py      # Interactive console UI
+│   ├── onboarding.py       # Contextual help and onboarding system
+│   └── tui/                # Terminal User Interface components
+│       ├── __init__.py
+│       └── main.py         # TUI implementation (future)
 ├── utils/                  # Utility functions
 │   ├── __init__.py
 │   ├── display.py          # Display and formatting utilities
@@ -177,6 +196,17 @@ You can add your own development environment templates:
 2. Define your Docker Compose configuration and any additional files needed
 3. Register your template in the `TemplateManager._register_templates()` method
 4. Your template will automatically be available in both CLI and interactive modes
+
+### Customizing the Onboarding System
+
+You can extend or modify the onboarding system to add custom help topics or contextual tips:
+
+1. Add new help topics by creating appropriate methods (like `_show_new_feature_help()`) in the `OnboardingManager` class 
+2. Add entries to the `topics` dictionary in the `show_topic()` method to make them accessible
+3. Add new section-specific first-time help in the `section_help` dictionary in `show_first_time_section_help()`
+4. Add new contextual suggestions in the `suggestions` dictionary in the `maybe_show_suggestion()` method
+5. The onboarding system will automatically track which topics users have seen and which sections they've visited
+6. All help content is organized by menu/section and action for easy contextual navigation
 
 Example for creating a new template:
 
