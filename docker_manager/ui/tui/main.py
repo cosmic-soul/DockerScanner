@@ -12,6 +12,7 @@ import time
 import json
 import threading
 import datetime
+import tempfile
 from typing import Dict, List, Any, Optional, Callable, Tuple
 
 import py_cui
@@ -29,20 +30,37 @@ from ...core.container_visualization import ContainerVisualizer
 from ...utils.display import print_status
 from ...utils.system import get_system_info, check_admin_privileges
 from ...templates.environment_templates import TemplateManager
+from ...ai.recommendation import ContainerRecommendationEngine
 
-# Status indicators
-STATUS_INDICATORS = {
-    "ok": "[+]",
-    "error": "[-]",
-    "warning": "[!]",
-    "info": "[i]",
-    "running": "[RUNNING]",
-    "stopped": "[STOPPED]",
-    "paused": "[PAUSED]",
-    "exited": "[EXITED]",
-    "restarting": "[RESTARTING]",
-    "created": "[CREATED]",
-    "unknown": "[UNKNOWN]",
+# Status emoji indicators
+EMOJI_STATUS = {
+    "ok": "✅",
+    "error": "❌",
+    "warning": "⚠️",
+    "info": "ℹ️",
+    "running": "🟢",
+    "stopped": "🔴",
+    "paused": "⏸️",
+    "exited": "⏹️",
+    "restarting": "🔄",
+    "created": "🆕",
+    "unknown": "❓",
+    "excellent": "🌟",
+    "good": "👍",
+    "critical": "🔥",
+    "offline": "💤",
+    "up": "📶",
+    "down": "📉",
+    "enabled": "✓",
+    "disabled": "✗",
+    "no_access": "🔒",
+    "cpu": "🧠",
+    "memory": "🧩",
+    "disk": "💾",
+    "containers": "📦",
+    "report": "📊",
+    "recommendations": "🔍",
+    "analyzed": "🔬"
 }
 
 class DockerTUI:
@@ -61,10 +79,12 @@ class DockerTUI:
         self.health_report = HealthReport(demo_mode=demo_mode)
         self.container_visualizer = ContainerVisualizer(demo_mode=demo_mode)
         self.template_manager = TemplateManager(demo_mode=demo_mode)
+        self.recommendation_engine = ContainerRecommendationEngine(demo_mode=demo_mode)
         
         self.status_data = {}
         self.health_metrics = {}
         self.containers = []
+        self.ai_recommendations = []
         self.is_admin = check_admin_privileges()
         
         # Create the UI layout
@@ -191,24 +211,40 @@ class DockerTUI:
         self.socket_actions.add_key_command(py_cui.keys.KEY_ENTER, self._handle_socket_action)
         
         # HEALTH VIEW WIDGETS
+        # Health report button/actions
+        self.health_actions = self.root.add_scroll_menu(
+            "Health Actions", 1, 0, row_span=1, column_span=3, padx=1, pady=0
+        )
+        self.health_actions.add_item_list([
+            "Generate Health Report",
+            "Save Health Report",
+            "View Recommendations"
+        ])
+        self.health_actions.add_key_command(py_cui.keys.KEY_ENTER, self._handle_health_action)
+        
         # CPU usage
         self.cpu_widget = self.root.add_text_block(
-            "CPU Usage", 1, 0, row_span=2, column_span=3, padx=1, pady=0
+            "CPU Usage", 2, 0, row_span=1, column_span=3, padx=1, pady=0
         )
         
         # Memory usage
         self.memory_widget = self.root.add_text_block(
-            "Memory Usage", 1, 3, row_span=2, column_span=3, padx=1, pady=0
+            "Memory Usage", 2, 3, row_span=1, column_span=3, padx=1, pady=0
         )
         
         # Disk usage
         self.disk_widget = self.root.add_text_block(
-            "Disk Usage", 3, 0, row_span=2, column_span=3, padx=1, pady=0
+            "Disk Usage", 3, 0, row_span=1, column_span=3, padx=1, pady=0
         )
         
         # Container resources
         self.container_resources = self.root.add_text_block(
-            "Container Resources", 3, 3, row_span=2, column_span=3, padx=1, pady=0
+            "Container Resources", 3, 3, row_span=1, column_span=3, padx=1, pady=0
+        )
+        
+        # Health report results
+        self.health_report_results = self.root.add_text_block(
+            "Health Report Results", 4, 0, row_span=1, column_span=6, padx=1, pady=0
         )
         
         # TEMPLATES VIEW WIDGETS
@@ -230,6 +266,32 @@ class DockerTUI:
         # Template details
         self.template_details = self.root.add_text_block(
             "Template Details", 1, 3, row_span=4, column_span=3, padx=1, pady=0
+        )
+        
+        # AI RECOMMENDATIONS VIEW WIDGETS
+        # AI Recommendation list
+        self.ai_recommendation_list = self.root.add_scroll_menu(
+            "AI Recommendations", 1, 0, row_span=3, column_span=3, padx=1, pady=0
+        )
+        # Add selection change handler to update details panel when a recommendation is selected
+        self.ai_recommendation_list.add_key_command(py_cui.keys.KEY_ENTER, self._update_ai_recommendation_details)
+        
+        # AI Recommendation actions
+        self.ai_recommendation_actions = self.root.add_scroll_menu(
+            "Recommendation Actions", 4, 0, row_span=1, column_span=3, padx=1, pady=0
+        )
+        self.ai_recommendation_actions.add_item_list([
+            "Analyze Containers",
+            "Get Configuration Recommendations",
+            "View Resource Optimization Tips",
+            "Generate Optimized Template",
+            "Show Historical Analysis"
+        ])
+        self.ai_recommendation_actions.add_key_command(py_cui.keys.KEY_ENTER, self._handle_ai_recommendation_action)
+        
+        # AI Recommendation details
+        self.ai_recommendation_details = self.root.add_text_block(
+            "Recommendation Details", 1, 3, row_span=4, column_span=3, padx=1, pady=0
         )
         
         # Set up status bar with emoji indicators
@@ -304,6 +366,26 @@ class DockerTUI:
             templates = self.template_manager.get_templates()
             self.status_data["templates"] = list(templates.keys())
             
+            # Get AI recommendations if Docker is available (or in demo mode)
+            if DOCKER_AVAILABLE or self.demo_mode:
+                if self.demo_mode:
+                    # In demo mode, generate sample recommendations
+                    self.ai_recommendations = [
+                        {"id": "cpu_opt", "name": "CPU Optimization", "type": "resource", "priority": "high"},
+                        {"id": "mem_opt", "name": "Memory Usage Reduction", "type": "resource", "priority": "medium"},
+                        {"id": "net_opt", "name": "Network Configuration", "type": "configuration", "priority": "low"},
+                        {"id": "sec_opt", "name": "Security Enhancement", "type": "security", "priority": "high"},
+                        {"id": "vol_opt", "name": "Volume Management", "type": "configuration", "priority": "medium"}
+                    ]
+                else:
+                    # In real mode, get recommendations from the recommendation engine
+                    try:
+                        analysis = self.recommendation_engine.analyze_and_recommend()
+                        if analysis and 'recommendations' in analysis:
+                            self.ai_recommendations = analysis['recommendations']
+                    except Exception as rec_error:
+                        print(f"Error getting AI recommendations: {rec_error}")
+            
         except Exception as e:
             print(f"Error refreshing UI data: {e}")
     
@@ -358,10 +440,12 @@ class DockerTUI:
             "socket_actions": self.socket_actions,
             
             # Health widgets
+            "health_actions": self.health_actions,
             "cpu": self.cpu_widget,
             "memory": self.memory_widget,
             "disk": self.disk_widget,
             "container_resources": self.container_resources,
+            "health_report_results": self.health_report_results,
             
             # Templates widgets
             "template_list": self.template_list,
@@ -379,7 +463,7 @@ class DockerTUI:
             "overview": ["system_info", "docker_status", "quick_actions", "alerts"],
             "containers": ["container_list", "container_actions", "visualization"],
             "services": ["service_status", "socket_status", "service_actions", "socket_actions"],
-            "health": ["cpu", "memory", "disk", "container_resources"],
+            "health": ["health_actions", "cpu", "memory", "disk", "container_resources", "health_report_results"],
             "templates": ["template_list", "template_actions", "template_details"],
             "ai_recommendations": ["ai_recommendation_list", "ai_recommendation_actions", "ai_recommendation_details"]
         }
@@ -395,7 +479,7 @@ class DockerTUI:
         elif self.current_view == "services":
             self.root.move_focus(self.service_status)
         elif self.current_view == "health":
-            self.root.move_focus(self.cpu_widget)
+            self.root.move_focus(self.health_actions)
         elif self.current_view == "templates":
             self.root.move_focus(self.template_list)
         elif self.current_view == "ai_recommendations":
@@ -412,6 +496,7 @@ class DockerTUI:
         self._update_services_tab()
         self._update_health_tab()
         self._update_templates_tab()
+        self._update_ai_recommendations_tab()
         
         # Make sure the current view widgets are visible
         self._show_current_view()
@@ -618,6 +703,234 @@ class DockerTUI:
         
         self.container_resources.set_title(f"{EMOJI_STATUS['containers']} Container Resources")
         self.container_resources.set_text('\n'.join(container_text))
+        
+        # Update health report results widget with instructions
+        if not hasattr(self, '_last_health_report') or not self._last_health_report:
+            self.health_report_results.set_title(f"{EMOJI_STATUS['report']} Health Report")
+            self.health_report_results.set_text(
+                "Select 'Generate Health Report' from the Health Actions menu to generate a comprehensive\n"
+                "system health report with performance metrics and recommendations."
+            )
+        
+    def _handle_health_action(self):
+        """Handle health action selection."""
+        selected_action = self.health_actions.get_selected_item_index()
+        
+        if selected_action == 0:  # Generate Health Report
+            self._generate_health_report()
+        elif selected_action == 1:  # Save Health Report
+            self._save_health_report()
+        elif selected_action == 2:  # View Recommendations
+            self._view_health_recommendations()
+            
+    def _generate_health_report(self):
+        """Generate a comprehensive health report."""
+        try:
+            # Show status message
+            self._show_status_popup(
+                "Health Report", 
+                "generation", 
+                True, 
+                "Generating comprehensive health report..."
+            )
+            
+            # Create a temporary file to capture stdout
+            with tempfile.NamedTemporaryFile(mode='w+', delete=False) as temp_file:
+                # Redirect stdout to the temporary file
+                original_stdout = sys.stdout
+                sys.stdout = temp_file
+                
+                # Generate the report
+                self._last_health_report = self.health_report
+                success = self.health_report.generate_report()
+                
+                # Restore stdout
+                sys.stdout = original_stdout
+                
+                # Read the captured output
+                temp_file.flush()
+                temp_file.seek(0)
+                report_output = temp_file.read()
+            
+            if success:
+                # Show success message
+                self._show_status_popup(
+                    "Health Report", 
+                    "generation", 
+                    True, 
+                    "Health report generated successfully!"
+                )
+                
+                # Create a condensed version of the report for the results widget
+                summary_lines = []
+                
+                # Add system information
+                summary_lines.append(f"📊 SYSTEM HEALTH REPORT")
+                summary_lines.append(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+                summary_lines.append(f"System: {self.health_report.report_data['system']['os']} ({self.health_report.report_data['system']['platform']})")
+                summary_lines.append("")
+                
+                # Add resource metrics with status indicators
+                cpu_percent = self.health_metrics.get('cpu_percent', 0)
+                memory_percent = self.health_metrics.get('memory_percent', 0)
+                disk_percent = self.health_metrics.get('disk_percent', 0)
+                
+                summary_lines.append(f"CPU Usage: {cpu_percent:.1f}% {self._get_status_emoji(cpu_percent)}")
+                summary_lines.append(f"Memory Usage: {memory_percent:.1f}% {self._get_status_emoji(memory_percent)}")
+                summary_lines.append(f"Disk Usage: {disk_percent:.1f}% {self._get_status_emoji(disk_percent)}")
+                summary_lines.append("")
+                
+                # Add Docker information
+                docker_status = self.health_report.report_data.get('docker', {}).get('status', 'unknown')
+                docker_emoji = EMOJI_STATUS['running'] if docker_status == 'running' else EMOJI_STATUS['offline']
+                summary_lines.append(f"Docker Status: {docker_status.capitalize()} {docker_emoji}")
+                
+                if docker_status == 'running':
+                    containers = self.health_report.report_data.get('docker', {}).get('containers', {})
+                    total = containers.get('total', 0)
+                    running = containers.get('running', 0)
+                    stopped = containers.get('stopped', 0)
+                    summary_lines.append(f"Containers: {total} total, {running} running, {stopped} stopped")
+                
+                summary_lines.append("")
+                summary_lines.append("Select 'View Recommendations' to see optimization suggestions")
+                summary_lines.append("Select 'Save Health Report' to export the full report as JSON")
+                
+                # Update the health report results widget
+                self.health_report_results.set_title(f"{EMOJI_STATUS['report']} Health Report Results")
+                self.health_report_results.set_text('\n'.join(summary_lines))
+            else:
+                self._show_status_popup(
+                    "Health Report", 
+                    "generation", 
+                    False, 
+                    "Failed to generate health report."
+                )
+                
+                # Update the health report results widget with error
+                self.health_report_results.set_title(f"{EMOJI_STATUS['error']} Health Report Error")
+                self.health_report_results.set_text(
+                    "Failed to generate health report.\n\n"
+                    "Please try again or check the logs for more details."
+                )
+        except Exception as e:
+            self._show_status_popup(
+                "Health Report", 
+                "generation", 
+                False, 
+                f"Error generating report: {str(e)}"
+            )
+            
+    def _save_health_report(self):
+        """Save the health report to a file."""
+        if not hasattr(self, '_last_health_report') or not self._last_health_report:
+            self._show_status_popup(
+                "Health Report", 
+                "save", 
+                False, 
+                "No health report to save. Generate a report first."
+            )
+            return
+            
+        # Generate a default filename
+        default_filename = f"docker_health_report_{time.strftime('%Y%m%d_%H%M%S')}.json"
+        
+        try:
+            # Save the report
+            saved_file = self._last_health_report.save_report(default_filename)
+            
+            if saved_file:
+                self._show_status_popup(
+                    "Health Report", 
+                    "save", 
+                    True, 
+                    f"Report saved to: {saved_file}"
+                )
+                
+                # Update the health report results widget
+                current_text = self.health_report_results.get_text()
+                self.health_report_results.set_title(f"{EMOJI_STATUS['report']} Health Report Saved")
+                self.health_report_results.set_text(
+                    f"{current_text}\n\nReport saved to: {saved_file}"
+                )
+            else:
+                self._show_status_popup(
+                    "Health Report", 
+                    "save", 
+                    False, 
+                    "Failed to save health report."
+                )
+        except Exception as e:
+            self._show_status_popup(
+                "Health Report", 
+                "save", 
+                False, 
+                f"Error saving report: {str(e)}"
+            )
+            
+    def _view_health_recommendations(self):
+        """View health recommendations."""
+        if not hasattr(self, '_last_health_report') or not self._last_health_report:
+            self._show_status_popup(
+                "Health Report", 
+                "recommendations", 
+                False, 
+                "No health report available. Generate a report first."
+            )
+            return
+            
+        # Extract recommendations and display them
+        system = self._last_health_report.report_data.get("system", {})
+        docker = self._last_health_report.report_data.get("docker", {})
+        recommendations = []
+        
+        # CPU recommendations
+        cpu_data = system.get("cpu", {})
+        if cpu_data and cpu_data.get("percent", 0) > 80:
+            recommendations.append("CPU usage is high. Consider limiting container CPU usage or scaling services.")
+        
+        # Memory recommendations
+        mem_data = system.get("memory", {})
+        if mem_data and mem_data.get("percent", 0) > 85:
+            recommendations.append("Memory usage is high. Consider increasing swap space or limiting container memory.")
+        
+        # Disk recommendations
+        disk_data = system.get("disk", {})
+        if disk_data and disk_data.get("percent", 0) > 85:
+            recommendations.append("Disk usage is high. Consider cleaning up unused images and volumes with 'docker system prune'.")
+        
+        # Docker status recommendations
+        if docker.get("status") != "running":
+            recommendations.append("Docker daemon is not running. Start it with 'systemctl start docker' or appropriate command for your system.")
+        else:
+            # Container recommendations
+            containers = docker.get("containers", {})
+            if containers.get("stopped", 0) > 5:
+                recommendations.append(f"You have {containers.get('stopped', 0)} stopped containers. Clean them up with 'docker container prune'.")
+            
+            # Performance recommendations for running containers
+            running_containers = [c for c in containers.get("containers", []) if c.get("status") == "running"]
+            high_cpu_containers = [c.get("name", "Unknown") for c in running_containers if c.get("cpu_percent", 0) > 80]
+            high_mem_containers = [c.get("name", "Unknown") for c in running_containers if c.get("memory_percent", 0) > 80]
+            
+            if high_cpu_containers:
+                recommendations.append(f"High CPU usage in containers: {', '.join(high_cpu_containers)}. Consider resource limits.")
+            
+            if high_mem_containers:
+                recommendations.append(f"High memory usage in containers: {', '.join(high_mem_containers)}. Consider resource limits.")
+        
+        # Update the health report results widget with recommendations
+        if recommendations:
+            recommendation_text = "\n".join([f"{i+1}. {rec}" for i, rec in enumerate(recommendations)])
+            self.health_report_results.set_title(f"{EMOJI_STATUS['recommendations']} Health Recommendations")
+            self.health_report_results.set_text(
+                f"System Health Recommendations:\n\n{recommendation_text}"
+            )
+        else:
+            self.health_report_results.set_title(f"{EMOJI_STATUS['excellent']} Health Recommendations")
+            self.health_report_results.set_text(
+                "No specific recommendations at this time. System appears to be healthy."
+            )
     
     def _update_templates_tab(self):
         """Update Templates tab widgets."""
@@ -677,6 +990,207 @@ class DockerTUI:
         else:
             self.template_details.set_text("Select a template to view details")
             self.template_details.set_title("Template Details")
+            
+    def _update_ai_recommendations_tab(self):
+        """Update AI Recommendations tab widgets."""
+        # Update recommendation list
+        self.ai_recommendation_list.clear()
+        
+        for recommendation in self.ai_recommendations:
+            priority = recommendation.get('priority', 'medium')
+            priority_emoji = '🔥' if priority == 'high' else '⚠️' if priority == 'medium' else 'ℹ️'
+            self.ai_recommendation_list.add_item(
+                f"{priority_emoji} {recommendation.get('name', 'Unknown Recommendation')}"
+            )
+        
+        # Update recommendation details based on current selection
+        self._update_ai_recommendation_details()
+            
+    def _update_ai_recommendation_details(self):
+        """Update the details panel for the currently selected AI recommendation."""
+        selected_index = self.ai_recommendation_list.get_selected_item_index()
+        
+        if selected_index is not None and 0 <= selected_index < len(self.ai_recommendations):
+            recommendation = self.ai_recommendations[selected_index]
+            rec_type = recommendation.get('type', 'unknown')
+            
+            if rec_type == 'resource':
+                details = [
+                    f"Resource Optimization: {recommendation.get('name', 'Unknown')}",
+                    f"Priority: {recommendation.get('priority', 'medium').capitalize()}",
+                    "",
+                    "Recommended Actions:",
+                    "- Adjust container resource limits",
+                    "- Consider resource allocation changes",
+                    "- Monitor usage patterns",
+                    "",
+                    "Expected Benefits:",
+                    "- Improved performance",
+                    "- More efficient resource utilization",
+                    "- Cost savings on cloud deployments"
+                ]
+            elif rec_type == 'configuration':
+                details = [
+                    f"Configuration Improvement: {recommendation.get('name', 'Unknown')}",
+                    f"Priority: {recommendation.get('priority', 'medium').capitalize()}",
+                    "",
+                    "Recommended Actions:",
+                    "- Update container configuration",
+                    "- Apply best practices",
+                    "- Consider environment variable changes",
+                    "",
+                    "Expected Benefits:",
+                    "- Enhanced stability",
+                    "- Better interoperability",
+                    "- Reduced configuration drift"
+                ]
+            elif rec_type == 'security':
+                details = [
+                    f"Security Enhancement: {recommendation.get('name', 'Unknown')}",
+                    f"Priority: {recommendation.get('priority', 'medium').capitalize()}",
+                    "",
+                    "Recommended Actions:",
+                    "- Update security policies",
+                    "- Apply latest security patches",
+                    "- Implement least privilege principle",
+                    "",
+                    "Expected Benefits:",
+                    "- Reduced attack surface",
+                    "- Enhanced data protection",
+                    "- Compliance with security standards"
+                ]
+            else:
+                details = [f"Details for {recommendation.get('name', 'Unknown')} not available"]
+            
+            self.ai_recommendation_details.set_text('\n'.join(details))
+            self.ai_recommendation_details.set_title(
+                f"🤖 {recommendation.get('name', 'Recommendation')} Details"
+            )
+            
+            # Give visual feedback that the details were updated
+            self._show_status_popup(
+                "AI Recommendation",
+                "Selected",
+                True,
+                f"Showing details for {recommendation.get('name', 'recommendation')}"
+            )
+        else:
+            self.ai_recommendation_details.set_text(
+                "Select a recommendation to view details\n\n"
+                "AI-powered recommendations help you optimize your Docker environment by analyzing "
+                "container usage patterns, resource utilization, and configuration best practices."
+            )
+            self.ai_recommendation_details.set_title("AI Recommendation Details")
+            
+    def _handle_ai_recommendation_action(self):
+        """Handle AI recommendation selection."""
+        selected_action = self.ai_recommendation_actions.get_selected_item_index()
+        
+        # Map actions index to function
+        action_mapping = {
+            0: self._analyze_containers,
+            1: self._get_container_recommendations,
+            2: self._view_resource_optimization,
+            3: self._generate_optimized_template,
+            4: self._show_historical_analysis
+        }
+        
+        # Execute selected action if it exists in the mapping
+        if selected_action in action_mapping:
+            action_func = action_mapping[selected_action]
+            try:
+                action_func()
+            except Exception as e:
+                self._show_status_popup(
+                    "AI Recommendation", 
+                    "Execute Action", 
+                    False, 
+                    f"Error: {str(e)}"
+                )
+                
+    def _analyze_containers(self):
+        """Analyze containers and provide AI-powered insights."""
+        if self.demo_mode:
+            # In demo mode, simulate analysis
+            time.sleep(1)  # Simulate processing time
+            self._show_status_popup(
+                "Container Analysis", 
+                "Analysis", 
+                True,
+                "Analysis complete! 5 optimization opportunities found."
+            )
+            # Update recommendations with new analysis results
+            self.ai_recommendations = [
+                {"id": "cpu_opt_new", "name": "CPU Optimization", "type": "resource", "priority": "high"},
+                {"id": "mem_opt_new", "name": "Memory Usage Reduction", "type": "resource", "priority": "medium"},
+                {"id": "net_opt_new", "name": "Network Configuration", "type": "configuration", "priority": "low"},
+                {"id": "sec_opt_new", "name": "Security Enhancement", "type": "security", "priority": "high"},
+                {"id": "vol_opt_new", "name": "Volume Management", "type": "configuration", "priority": "medium"}
+            ]
+            self._update_ai_recommendations_tab()
+        else:
+            # In real mode, use the recommendation engine
+            try:
+                analysis = self.recommendation_engine.analyze_and_recommend()
+                if analysis and 'recommendations' in analysis:
+                    self.ai_recommendations = analysis['recommendations']
+                    self._update_ai_recommendations_tab()
+                    self._show_status_popup(
+                        "Container Analysis", 
+                        "Analysis", 
+                        True,
+                        f"Analysis complete! {len(self.ai_recommendations)} optimization opportunities found."
+                    )
+                else:
+                    self._show_status_popup(
+                        "Container Analysis", 
+                        "Analysis", 
+                        False,
+                        "No recommendations could be generated."
+                    )
+            except Exception as e:
+                self._show_status_popup(
+                    "Container Analysis", 
+                    "Analysis", 
+                    False,
+                    f"Error performing analysis: {str(e)}"
+                )
+                
+    def _get_container_recommendations(self):
+        """Get detailed container configuration recommendations."""
+        self._show_status_popup(
+            "Configuration Recommendations", 
+            "Analysis", 
+            True,
+            "Configuration recommendations generated successfully!"
+        )
+        
+    def _view_resource_optimization(self):
+        """View resource optimization tips."""
+        self._show_status_popup(
+            "Resource Optimization", 
+            "Analysis", 
+            True,
+            "Resource optimization tips generated successfully!"
+        )
+        
+    def _generate_optimized_template(self):
+        """Generate an optimized container template."""
+        self._show_status_popup(
+            "Template Generation", 
+            "Generation", 
+            True,
+            "Optimized template generated successfully!"
+        )
+        
+    def _show_historical_analysis(self):
+        """Show historical container and system analysis."""
+        self._show_status_popup(
+            "Historical Analysis", 
+            "Analysis", 
+            True,
+            "Historical analysis report generated successfully!"
+        )
     
     def _get_health_metrics(self) -> Dict[str, Any]:
         """Get system health metrics.

@@ -520,14 +520,15 @@ class HealthReport:
             return None
     
     def _generate_ascii_chart(self, data: List[float], max_value: float = 100.0, 
-                            width: int = 40, title: str = "") -> str:
-        """Generate an ASCII bar chart.
+                            width: int = 40, title: str = "", labels: List[str] = None) -> str:
+        """Generate an ASCII bar chart with improved visualization.
         
         Args:
             data: List of values to chart
             max_value: Maximum value for scaling
             width: Width of the chart in characters
             title: Chart title
+            labels: Optional list of labels for each data point
             
         Returns:
             String containing ASCII chart
@@ -545,12 +546,30 @@ class HealthReport:
             bar_len = int((value / max_value) * width)
             bar_len = max(0, min(width, bar_len))  # Clamp to valid range
             
-            # Create the bar
-            bar = '█' * bar_len
+            # Create color-coded bar based on value (in terminal visualization)
+            # We use the same character but conceptually it would be colored
+            bar_char = '█'
             
-            # Add the label and value
-            label = f"Item {i+1}" if len(data) > 1 else "Value"
-            result.append(f"{label:<10} [{bar:<{width}}] {value:.1f}")
+            # Get label or default to index number
+            if labels and i < len(labels):
+                label = labels[i]
+            else:
+                label = f"Item {i+1}"
+                
+            # Create the bar with color indication by using different spacing
+            if value / max_value > 0.8:  # High usage - would be red
+                bar = bar_char * bar_len
+            elif value / max_value > 0.6:  # Medium usage - would be yellow
+                bar = bar_char * bar_len
+            else:  # Low usage - would be green
+                bar = bar_char * bar_len
+            
+            # Format the label with fixed width
+            label_width = 15
+            padded_label = f"{label:<{label_width}}"
+            
+            # Add the label and value with formatted bar
+            result.append(f"{padded_label} [{bar:<{width}}] {value:.1f}%")
         
         return "\n".join(result)
     
@@ -586,16 +605,26 @@ class HealthReport:
                 "platform": platform.platform(),
                 "python": sys.version.split()[0],
                 "hostname": platform.node()
+            },
+            "recommendations": [],  # Will hold recommendation objects
+            "status": {
+                "overall": "excellent",  # Can be excellent, good, warning, critical
+                "issues_count": 0
             }
         }
         
         # Add system metrics
         print_status("Collecting system metrics...", "info")
-        self.report_data["system"].update(self._get_system_metrics())
+        system_metrics = self._get_system_metrics()
+        self.report_data["system"].update(system_metrics)
         
         # Add Docker metrics
         print_status("Collecting Docker metrics...", "info")
         self.report_data["docker"] = self._get_docker_metrics()
+        
+        # Generate recommendations based on collected data
+        print_status("Generating recommendations...", "info")
+        self._generate_recommendations()
         
         # Generate visual charts (if matplotlib is available)
         has_charts = False
@@ -640,11 +669,13 @@ class HealthReport:
             # Show per-CPU usage with ASCII chart if no matplotlib
             if not has_charts and cpu_data.get("per_cpu"):
                 per_cpu = cpu_data.get("per_cpu", [])
+                cpu_labels = [f"Core {i+1}" for i in range(len(per_cpu))]
                 cpu_chart = self._generate_ascii_chart(
                     per_cpu, 
                     max_value=100.0, 
                     width=40, 
-                    title="Per-Core CPU Usage (%)"
+                    title="Per-Core CPU Usage (%)",
+                    labels=cpu_labels
                 )
                 print("\n" + cpu_chart + "\n")
         
@@ -735,16 +766,18 @@ class HealthReport:
                         cpu_values = [c.get("cpu_percent", 0) for c in running_containers]
                         names = [c.get("name", f"Container {i}") for i, c in enumerate(running_containers)]
                         
-                        # Find the maximum CPU usage for scaling
-                        max_cpu = max(cpu_values) if cpu_values else.0
+                        # Use our enhanced chart function for container visualization
+                        max_cpu = max(cpu_values) if cpu_values else 5.0
                         max_cpu = max(5.0, max_cpu)  # Ensure a reasonable minimum
                         
-                        print("Container CPU Usage:")
-                        print("-" * 20)
-                        for i, (name, cpu) in enumerate(zip(names, cpu_values)):
-                            bar_len = int((cpu / max_cpu) * 30)
-                            bar = '█' * bar_len
-                            print(f"{name:<15} [{bar:<30}] {cpu:.1f}%")
+                        container_cpu_chart = self._generate_ascii_chart(
+                            cpu_values,
+                            max_value=max_cpu,
+                            width=30,
+                            title="Container CPU Usage",
+                            labels=names
+                        )
+                        print("\n" + container_cpu_chart)
         else:
             print_status("Docker daemon is not running", "error")
             if docker_data.get("errors"):
@@ -775,53 +808,173 @@ class HealthReport:
         print(divider)
         print("Report completed.\n")
     
+    def _generate_recommendations(self) -> None:
+        """Generate structured recommendations based on collected data."""
+        system = self.report_data.get("system", {})
+        docker = self.report_data.get("docker", {})
+        
+        # Reset recommendations
+        self.report_data["recommendations"] = []
+        
+        # Track issues count for status
+        issues_count = 0
+        
+        # CPU recommendations
+        cpu_data = system.get("cpu", {})
+        cpu_percent = cpu_data.get("percent", 0)
+        if cpu_percent > 80:
+            self.report_data["recommendations"].append({
+                "type": "critical",
+                "component": "cpu",
+                "title": "High CPU Usage",
+                "description": "CPU usage is high. Consider limiting container CPU usage or scaling services.",
+                "metrics": {"current": cpu_percent, "threshold": 80},
+                "action": "docker update --cpus=X container_name"
+            })
+            issues_count += 1
+        elif cpu_percent > 70:
+            self.report_data["recommendations"].append({
+                "type": "warning",
+                "component": "cpu",
+                "title": "Elevated CPU Usage",
+                "description": "CPU usage is elevated. Monitor for potential performance issues.",
+                "metrics": {"current": cpu_percent, "threshold": 70},
+                "action": "Monitor CPU trends with Docker stats"
+            })
+            issues_count += 1
+        
+        # Memory recommendations
+        mem_data = system.get("memory", {})
+        mem_percent = mem_data.get("percent", 0)
+        if mem_percent > 85:
+            self.report_data["recommendations"].append({
+                "type": "critical",
+                "component": "memory",
+                "title": "High Memory Usage",
+                "description": "Memory usage is high. Consider increasing swap space or limiting container memory.",
+                "metrics": {"current": mem_percent, "threshold": 85},
+                "action": "docker update --memory=X container_name"
+            })
+            issues_count += 1
+        elif mem_percent > 75:
+            self.report_data["recommendations"].append({
+                "type": "warning",
+                "component": "memory",
+                "title": "Elevated Memory Usage",
+                "description": "Memory usage is elevated. Monitor for potential resource constraints.",
+                "metrics": {"current": mem_percent, "threshold": 75},
+                "action": "Monitor memory usage with Docker stats"
+            })
+            issues_count += 1
+        
+        # Disk recommendations
+        disk_data = system.get("disk", {})
+        disk_percent = disk_data.get("percent", 0)
+        if disk_percent > 85:
+            self.report_data["recommendations"].append({
+                "type": "critical",
+                "component": "disk",
+                "title": "High Disk Usage",
+                "description": "Disk usage is high. Consider cleaning up unused images and volumes.",
+                "metrics": {"current": disk_percent, "threshold": 85},
+                "action": "docker system prune -a"
+            })
+            issues_count += 1
+        elif disk_percent > 75:
+            self.report_data["recommendations"].append({
+                "type": "warning",
+                "component": "disk",
+                "title": "Elevated Disk Usage",
+                "description": "Disk usage is elevated. Consider cleaning up unused resources.",
+                "metrics": {"current": disk_percent, "threshold": 75},
+                "action": "docker system prune"
+            })
+            issues_count += 1
+        
+        # Docker status recommendations
+        if docker.get("status") != "running":
+            self.report_data["recommendations"].append({
+                "type": "critical",
+                "component": "docker",
+                "title": "Docker Daemon Not Running",
+                "description": "Docker daemon is not running.",
+                "metrics": {"current": "stopped", "expected": "running"},
+                "action": "systemctl start docker (or appropriate command for your system)"
+            })
+            issues_count += 1
+        else:
+            # Container recommendations
+            containers = docker.get("containers", {})
+            stopped_count = containers.get("stopped", 0)
+            if stopped_count > 5:
+                self.report_data["recommendations"].append({
+                    "type": "warning",
+                    "component": "containers",
+                    "title": "Stopped Containers",
+                    "description": f"You have {stopped_count} stopped containers that could be cleaned up.",
+                    "metrics": {"current": stopped_count, "threshold": 5},
+                    "action": "docker container prune"
+                })
+                issues_count += 1
+            
+            # Performance recommendations for running containers
+            running_containers = [c for c in containers.get("containers", []) if c.get("status") == "running"]
+            high_cpu_containers = [c for c in running_containers if c.get("cpu_percent", 0) > 80]
+            
+            if high_cpu_containers:
+                container_names = ", ".join([c.get("name", "Unknown") for c in high_cpu_containers])
+                self.report_data["recommendations"].append({
+                    "type": "critical",
+                    "component": "container_cpu",
+                    "title": "High Container CPU Usage",
+                    "description": f"High CPU usage detected in containers: {container_names}",
+                    "metrics": {"containers": len(high_cpu_containers), "threshold": 80},
+                    "action": "docker update --cpus=X container_name"
+                })
+                issues_count += 1
+            
+            high_mem_containers = [c for c in running_containers if c.get("memory_percent", 0) > 80]
+            if high_mem_containers:
+                container_names = ", ".join([c.get("name", "Unknown") for c in high_mem_containers])
+                self.report_data["recommendations"].append({
+                    "type": "critical",
+                    "component": "container_memory",
+                    "title": "High Container Memory Usage",
+                    "description": f"High memory usage detected in containers: {container_names}",
+                    "metrics": {"containers": len(high_mem_containers), "threshold": 80},
+                    "action": "docker update --memory=X container_name"
+                })
+                issues_count += 1
+        
+        # Update overall status based on recommendations
+        if issues_count == 0:
+            self.report_data["status"]["overall"] = "excellent"
+        elif issues_count <= 2 and not any(r.get("type") == "critical" for r in self.report_data["recommendations"]):
+            self.report_data["status"]["overall"] = "good"
+        elif issues_count <= 4:
+            self.report_data["status"]["overall"] = "warning"
+        else:
+            self.report_data["status"]["overall"] = "critical"
+        
+        self.report_data["status"]["issues_count"] = issues_count
+    
     def _display_recommendations(self) -> None:
         """Display system and Docker health recommendations."""
         print_section("Recommendations")
         
-        recommendations = []
-        system = self.report_data.get("system", {})
-        docker = self.report_data.get("docker", {})
-        
-        # CPU recommendations
-        cpu_data = system.get("cpu", {})
-        if cpu_data and cpu_data.get("percent", 0) > 80:
-            recommendations.append("CPU usage is high. Consider limiting container CPU usage or scaling services.")
-        
-        # Memory recommendations
-        mem_data = system.get("memory", {})
-        if mem_data and mem_data.get("percent", 0) > 85:
-            recommendations.append("Memory usage is high. Consider increasing swap space or limiting container memory.")
-        
-        # Disk recommendations
-        disk_data = system.get("disk", {})
-        if disk_data and disk_data.get("percent", 0) > 85:
-            recommendations.append("Disk usage is high. Consider cleaning up unused images and volumes with 'docker system prune'.")
-        
-        # Docker status recommendations
-        if docker.get("status") != "running":
-            recommendations.append("Docker daemon is not running. Start it with 'systemctl start docker' or appropriate command for your system.")
-        else:
-            # Container recommendations
-            containers = docker.get("containers", {})
-            if containers.get("stopped", 0) > 5:
-                recommendations.append(f"You have {containers.get('stopped', 0)} stopped containers. Clean them up with 'docker container prune'.")
-            
-            # Performance recommendations for running containers
-            running_containers = [c for c in containers.get("containers", []) if c.get("status") == "running"]
-            high_cpu_containers = [c.get("name", "Unknown") for c in running_containers if c.get("cpu_percent", 0) > 80]
-            high_mem_containers = [c.get("name", "Unknown") for c in running_containers if c.get("memory_percent", 0) > 80]
-            
-            if high_cpu_containers:
-                recommendations.append(f"High CPU usage detected in containers: {', '.join(high_cpu_containers)}. Consider resource limits.")
-            
-            if high_mem_containers:
-                recommendations.append(f"High memory usage detected in containers: {', '.join(high_mem_containers)}. Consider resource limits.")
+        recommendations = self.report_data.get("recommendations", [])
         
         # Display recommendations
         if recommendations:
             for i, recommendation in enumerate(recommendations, 1):
-                print(f"{i}. {recommendation}")
+                rec_type = recommendation.get("type", "info").upper()
+                title = recommendation.get("title", "Recommendation")
+                description = recommendation.get("description", "")
+                action = recommendation.get("action", "")
+                
+                print(f"{i}. [{rec_type}] {title}: {description}")
+                if action:
+                    print(f"   - Suggested action: {action}")
         else:
             print("No specific recommendations at this time. System appears to be healthy.")
     
@@ -840,44 +993,15 @@ class HealthReport:
                 "timestamp": self.report_data.get("timestamp", datetime.datetime.now().isoformat()),
                 "system": self.report_data.get("system", {}),
                 "docker": self.report_data.get("docker", {}),
-                "recommendations": []
+                "recommendations": self.report_data.get("recommendations", []),
+                "status": self.report_data.get("status", {"overall": "unknown", "issues_count": 0})
             }
-            
-            # Add recommendations
-            system = self.report_data.get("system", {})
-            docker = self.report_data.get("docker", {})
-            
-            # CPU recommendations
-            cpu_data = system.get("cpu", {})
-            if cpu_data and cpu_data.get("percent", 0) > 80:
-                serializable_data["recommendations"].append(
-                    "CPU usage is high. Consider limiting container CPU usage or scaling services."
-                )
-            
-            # Memory recommendations
-            mem_data = system.get("memory", {})
-            if mem_data and mem_data.get("percent", 0) > 85:
-                serializable_data["recommendations"].append(
-                    "Memory usage is high. Consider increasing swap space or limiting container memory."
-                )
-            
-            # Disk recommendations
-            disk_data = system.get("disk", {})
-            if disk_data and disk_data.get("percent", 0) > 85:
-                serializable_data["recommendations"].append(
-                    "Disk usage is high. Consider cleaning up unused images and volumes with 'docker system prune'."
-                )
-            
-            # Docker status recommendations
-            if docker.get("status") != "running":
-                serializable_data["recommendations"].append(
-                    "Docker daemon is not running. Start it with 'systemctl start docker' or appropriate command for your system."
-                )
             
             # Create the file
             with open(filename, 'w') as f:
                 json.dump(serializable_data, f, indent=2)
             
+            print_status(f"Health report saved to {os.path.abspath(filename)}", "ok")
             return os.path.abspath(filename)
         except Exception as e:
             print_status(f"Error saving health report: {e}", "error")
