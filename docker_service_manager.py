@@ -6,6 +6,7 @@ A cross-platform Python CLI tool for managing Docker daemon services
 with enhanced user experience and cross-system compatibility.
 """
 import sys
+import argparse
 from docker_manager.utils.display import show_banner
 from docker_manager.utils.system import check_requirements
 from docker_manager.ui.cli import setup_argparse, process_args
@@ -25,6 +26,7 @@ def main():
     check_requirements()
     
     # Process arguments and execute requested commands
+    # This will handle TUI and interactive modes
     exit_code = process_args(args)
     
     # Exit with appropriate code (0 for success, non-zero for error)

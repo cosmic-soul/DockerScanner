@@ -23,7 +23,9 @@ def setup_argparse() -> argparse.ArgumentParser:
     # Global arguments that apply to all commands
     parser.add_argument('--demo', action='store_true', help='Enable demo mode with simulated Docker responses')
     parser.add_argument('--interactive', '-i', action='store_true', help='Run in interactive mode with menu interface')
+    parser.add_argument('--tui', action='store_true', help='Run in Terminal User Interface (TUI) mode with advanced visuals')
     parser.add_argument('--version', '-v', action='store_true', help='Show Docker Manager version and exit')
+    parser.add_argument('--emoji', '-e', action='store_true', help='Enable emoji indicators in output')
     
     # Create subparsers for commands
     subparsers = parser.add_subparsers(dest='command', help='Commands')
@@ -120,6 +122,12 @@ def process_args(args: argparse.Namespace) -> int:
         print(f"Docker Service Manager v{__version__}")
         return 0
     
+    # If TUI mode is enabled, start Terminal User Interface
+    if args.tui:
+        from .tui.main_simple import run_simple_tui
+        run_simple_tui(demo_mode=args.demo)
+        return 0
+        
     # If interactive mode is enabled, start interactive console
     if args.interactive:
         from .interactive import InteractiveConsole
@@ -218,7 +226,7 @@ def process_args(args: argparse.Namespace) -> int:
         show_banner()
         print("\nError: No command specified")
         print("Run 'docker_service_manager.py -h' for help")
-        print("Or run with --interactive for menu interface")
+        print("Use --interactive for menu interface or --tui for graphical terminal interface")
         return 1
     
     return 0 if success else 1
