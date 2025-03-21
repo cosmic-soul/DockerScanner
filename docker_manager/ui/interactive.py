@@ -12,6 +12,7 @@ from ..core.container_visualization import ContainerVisualizer
 from ..templates.environment_templates import TemplateManager
 from ..utils.display import COLORS, get_terminal_size, show_banner, print_status, print_section
 from .onboarding import OnboardingManager
+from ..ai.recommendation import ContainerRecommendationEngine
 
 class InteractiveConsole:
     """Interactive console interface for Docker service management."""
@@ -25,6 +26,7 @@ class InteractiveConsole:
         self.manager = DockerServiceManager(demo_mode=demo_mode)
         self.template_manager = TemplateManager(demo_mode=demo_mode)
         self.onboarding = OnboardingManager(demo_mode=demo_mode)
+        self.recommendation_engine = ContainerRecommendationEngine(demo_mode=demo_mode)
         self.demo_mode = demo_mode
         self.running = True
         self.current_menu = "main"
@@ -46,6 +48,7 @@ class InteractiveConsole:
                     {"key": "4", "desc": "Templates", "action": lambda: self._change_menu("templates")},
                     {"key": "5", "desc": "System Information", "action": lambda: self._change_menu("info")},
                     {"key": "6", "desc": "Generate Health Report", "action": self._generate_health_report},
+                    {"key": "7", "desc": "AI Recommendations", "action": lambda: self._change_menu("ai_recommendations")},
                     {"key": "q", "desc": "Quit", "action": self._quit}
                 ]
             },
@@ -97,6 +100,17 @@ class InteractiveConsole:
                     {"key": "1", "desc": "List Available Templates", "action": self._list_templates},
                     {"key": "2", "desc": "Create Environment", "action": self._create_environment},
                     {"key": "3", "desc": "Launch Environment", "action": self._launch_environment},
+                    {"key": "b", "desc": "Back to Main Menu", "action": lambda: self._change_menu("main")}
+                ]
+            },
+            "ai_recommendations": {
+                "title": "AI Recommendations",
+                "options": [
+                    {"key": "1", "desc": "Analyze Containers", "action": self._analyze_containers},
+                    {"key": "2", "desc": "Get Container Configuration Recommendations", "action": self._get_container_recommendations},
+                    {"key": "3", "desc": "View Resource Optimization Tips", "action": self._view_resource_optimization},
+                    {"key": "4", "desc": "Generate Optimized Template", "action": self._generate_optimized_template},
+                    {"key": "5", "desc": "Show Historical Analysis", "action": self._show_historical_analysis},
                     {"key": "b", "desc": "Back to Main Menu", "action": lambda: self._change_menu("main")}
                 ]
             }
@@ -546,6 +560,362 @@ class InteractiveConsole:
         else:
             print_status("Failed to save health report", "error", demo_mode=self.demo_mode)
             
+        input("\nPress Enter to continue...")
+        
+    # AI recommendation actions
+    def _analyze_containers(self) -> None:
+        """Analyze containers and provide AI-powered insights."""
+        print_section("AI Container Analysis")
+        
+        print("Analyzing containers and system performance...")
+        print("This may take a few moments...\n")
+        
+        try:
+            # Run analysis
+            results = self.recommendation_engine.analyze_and_recommend()
+            
+            # Display analysis summary
+            container_analysis = results.get("analysis", {}).get("container_analysis", {})
+            system_metrics = results.get("analysis", {}).get("system_metrics", {})
+            
+            # System metrics summary
+            print_section("System Metrics")
+            print(f"CPU Usage: {system_metrics.get('cpu_usage', 0):.1f}%")
+            print(f"Memory Usage: {system_metrics.get('memory_usage', 0):.1f}%")
+            print(f"Disk Usage: {system_metrics.get('disk_usage', 0):.1f}%")
+            print()
+            
+            # Container summary
+            print_section("Container Summary")
+            print(f"Total Containers: {container_analysis.get('total_containers', 0)}")
+            print(f"Running Containers: {container_analysis.get('running_containers', 0)}")
+            print(f"Stopped Containers: {container_analysis.get('stopped_containers', 0)}")
+            print()
+            
+            # Resource usage
+            resource_usage = container_analysis.get("resource_usage", {})
+            print_section("Resource Usage")
+            print(f"Average Memory Usage: {resource_usage.get('average_memory_usage', 0):.1f} MB")
+            print(f"Average CPU Usage: {resource_usage.get('average_cpu_usage', 0):.1f}%")
+            print()
+            
+            # Display key insights
+            insights = []
+            
+            # Add high memory containers
+            high_memory = resource_usage.get("high_memory_containers", [])
+            if high_memory:
+                insights.append(f"- {len(high_memory)} containers with high memory usage detected")
+            
+            # Add high CPU containers
+            high_cpu = resource_usage.get("high_cpu_containers", [])
+            if high_cpu:
+                insights.append(f"- {len(high_cpu)} containers with high CPU usage detected")
+            
+            # Add idle containers
+            idle = resource_usage.get("idle_containers", [])
+            if idle:
+                insights.append(f"- {len(idle)} idle containers could be optimized or removed")
+            
+            # Add reliability issues
+            reliability = container_analysis.get("reliability", {})
+            high_restart = reliability.get("high_restart_containers", [])
+            if high_restart:
+                insights.append(f"- {len(high_restart)} containers have reliability issues (high restart counts)")
+            
+            # Print insights
+            if insights:
+                print_section("Key Insights")
+                for insight in insights:
+                    print(insight)
+                print()
+            
+            # Print recommendations count
+            recommendations = results.get("recommendations", [])
+            print_section("Recommendations")
+            
+            if recommendations:
+                print(f"Found {len(recommendations)} recommendations to optimize your Docker environment.")
+                print("Use 'Get Container Configuration Recommendations' for detailed recommendations.")
+            else:
+                print("No recommendations found. Your Docker environment appears to be well-configured.")
+            
+        except Exception as e:
+            print_status(f"Error during analysis: {e}", "error", demo_mode=self.demo_mode)
+        
+        input("\nPress Enter to continue...")
+    
+    def _get_container_recommendations(self) -> None:
+        """Get detailed container configuration recommendations."""
+        print_section("Container Configuration Recommendations")
+        
+        print("Analyzing container configurations...")
+        print("This may take a few moments...\n")
+        
+        try:
+            # Run analysis
+            results = self.recommendation_engine.analyze_and_recommend()
+            recommendations = results.get("recommendations", [])
+            
+            if not recommendations:
+                print("No recommendations found. Your container configurations appear optimal.")
+                input("\nPress Enter to continue...")
+                return
+            
+            # Group recommendations by type
+            recommendations_by_type = {}
+            for rec in recommendations:
+                rec_type = rec.get("type", "general")
+                if rec_type not in recommendations_by_type:
+                    recommendations_by_type[rec_type] = []
+                recommendations_by_type[rec_type].append(rec)
+            
+            # Display recommendations by type
+            for rec_type, recs in recommendations_by_type.items():
+                print_section(f"{rec_type.title()} Recommendations")
+                
+                for i, rec in enumerate(recs, 1):
+                    priority = rec.get("priority", "medium").upper()
+                    priority_color = {
+                        "HIGH": COLORS["RED"],
+                        "MEDIUM": COLORS["YELLOW"],
+                        "LOW": COLORS["GREEN"]
+                    }.get(priority, COLORS["RESET"])
+                    
+                    print(f"{i}. [{priority_color}{priority}{COLORS['RESET']}] {rec.get('title', 'Recommendation')}")
+                    print(f"   {rec.get('description', '')}")
+                    
+                    # Display actions
+                    actions = rec.get("actions", [])
+                    if actions:
+                        print("\n   Suggested actions:")
+                        for j, action in enumerate(actions, 1):
+                            print(f"   {j}. {action}")
+                    
+                    # Display affected containers if any
+                    affected = rec.get("affected_containers", [])
+                    if affected:
+                        print(f"\n   Affected containers: {', '.join(affected)}")
+                    
+                    print()
+            
+        except Exception as e:
+            print_status(f"Error generating recommendations: {e}", "error", demo_mode=self.demo_mode)
+        
+        input("\nPress Enter to continue...")
+    
+    def _view_resource_optimization(self) -> None:
+        """View resource optimization tips."""
+        print_section("Resource Optimization Tips")
+        
+        print("Analyzing system resources and container usage...")
+        print("This may take a few moments...\n")
+        
+        try:
+            # Run analysis
+            results = self.recommendation_engine.analyze_and_recommend()
+            resource_recommendations = results.get("resource_recommendations", {})
+            
+            # Display current resource profile
+            profile = resource_recommendations.get("resource_profile", "unknown")
+            profile_details = resource_recommendations.get("profile_details", {})
+            
+            print_section("Current Resource Profile")
+            print(f"Profile: {profile.upper()}")
+            print(f"Description: {profile_details.get('description', 'Unknown')}")
+            print()
+            
+            # Display resource recommendations
+            print_section("Resource Recommendations")
+            print(f"Recommended CPU: {resource_recommendations.get('recommended_cpu', 0)} cores")
+            print(f"Recommended Memory: {resource_recommendations.get('recommended_memory', '0m')}")
+            print(f"Recommended Memory Reservation: {resource_recommendations.get('recommended_memory_reservation', '0m')}")
+            print(f"Available Memory: {resource_recommendations.get('available_memory', '0m')}")
+            print()
+            
+            # Display optimization tips
+            print_section("Optimization Tips")
+            
+            # Based on profile, provide specific tips
+            if profile == "minimal":
+                print("1. Your system is resource-constrained. Consider adding more resources.")
+                print("2. Use lightweight container images like Alpine where possible.")
+                print("3. Set strict resource limits to prevent container resource contention.")
+                print("4. Consider removing unused or idle containers to free up resources.")
+            elif profile == "balanced":
+                print("1. Your system has adequate resources for your current workload.")
+                print("2. Monitor high-usage containers and adjust their limits as needed.")
+                print("3. Group related containers on the same network for better performance.")
+                print("4. Consider Docker Compose for easier resource management.")
+            elif profile == "performance" or profile == "cpu-optimized" or profile == "memory-optimized":
+                print("1. Your system has substantial resources available.")
+                print("2. Consider scaling up applications to utilize available resources.")
+                print("3. Use Docker's restart policies for automatic recovery.")
+                print("4. Implement health checks for better container reliability.")
+            else:
+                print("1. Set appropriate memory limits for containers.")
+                print("2. Use CPU quotas for CPU-intensive applications.")
+                print("3. Implement container orchestration for better resource allocation.")
+                print("4. Monitor container performance regularly.")
+            
+        except Exception as e:
+            print_status(f"Error generating resource optimization tips: {e}", "error", demo_mode=self.demo_mode)
+        
+        input("\nPress Enter to continue...")
+    
+    def _generate_optimized_template(self) -> None:
+        """Generate an optimized container template."""
+        print_section("Generate Optimized Template")
+        
+        # Show available templates
+        templates = self.recommendation_engine.APPLICATION_TEMPLATES
+        
+        print("Available template types:")
+        for template_id, template in templates.items():
+            print(f"  {template_id}: {template.get('name', 'Unknown')}")
+        print()
+        
+        # Ask for template type
+        template_id = input("Enter template type (e.g., web_server, database): ")
+        if not template_id or template_id not in templates:
+            print(f"Invalid template type. Please choose from: {', '.join(templates.keys())}")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Ask for target directory
+        target_dir = input("Enter target directory (default: current directory): ")
+        if not target_dir:
+            target_dir = os.getcwd()
+        
+        # Ask for custom parameters
+        print("\nCustomization options (press Enter to use defaults):")
+        
+        template = templates[template_id]
+        custom_params = {}
+        
+        # Get custom image
+        custom_image = input(f"Base image (default: {template.get('base_image', 'alpine:latest')}): ")
+        if custom_image:
+            custom_params["base_image"] = custom_image
+        
+        # Get custom resource profile
+        profiles = self.recommendation_engine.RESOURCE_PROFILES
+        print("\nAvailable resource profiles:")
+        for profile_id, profile in profiles.items():
+            print(f"  {profile_id}: {profile.get('description', 'Unknown')}")
+        
+        custom_profile = input(f"\nResource profile (default: {template.get('resource_profile', 'balanced')}): ")
+        if custom_profile and custom_profile in profiles:
+            custom_params["resource_profile"] = custom_profile
+        
+        # Generate the template
+        print(f"\nGenerating optimized {template.get('name', 'container')} template in {target_dir}...")
+        success, error = self.recommendation_engine.generate_template(
+            template_id=template_id,
+            target_dir=target_dir,
+            custom_params=custom_params
+        )
+        
+        if success:
+            print_status(f"Template generated successfully in {target_dir}", "ok", demo_mode=self.demo_mode)
+            print(f"\nFiles created:")
+            print(f"  - {target_dir}/docker-compose.yml")
+            print(f"  - {target_dir}/.env")
+            print(f"  - {target_dir}/README.md")
+            print("\nTo use this template, navigate to the directory and run:")
+            print(f"  cd {target_dir}")
+            print("  docker-compose up -d")
+        else:
+            print_status(f"Failed to generate template: {error}", "error", demo_mode=self.demo_mode)
+        
+        input("\nPress Enter to continue...")
+    
+    def _show_historical_analysis(self) -> None:
+        """Show historical container and system analysis."""
+        print_section("Historical Analysis")
+        
+        # Check if we have historical data
+        container_history = self.recommendation_engine.container_history
+        system_metrics_history = self.recommendation_engine.system_metrics_history
+        
+        if not container_history or not system_metrics_history:
+            print("No historical data available yet. Run a few analyses to collect data.")
+            input("\nPress Enter to continue...")
+            return
+        
+        # Limit display to last 10 entries
+        container_history = container_history[-10:]
+        system_metrics_history = system_metrics_history[-10:]
+        
+        # Display container history
+        print_section("Container Count History")
+        
+        # Create a simple ASCII chart
+        max_containers = max([entry.get("container_count", 0) for entry in container_history])
+        chart_width = 40
+        
+        for entry in container_history:
+            timestamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry.get("timestamp", 0)))
+            container_count = entry.get("container_count", 0)
+            running_count = entry.get("running_count", 0)
+            
+            # Calculate bar lengths
+            if max_containers > 0:
+                container_bar = int((container_count / max_containers) * chart_width)
+                running_bar = int((running_count / max_containers) * chart_width)
+            else:
+                container_bar = 0
+                running_bar = 0
+            
+            # Print chart bars
+            print(f"{timestamp} | ", end="")
+            print(f"Total: {container_count} " + "█" * container_bar)
+            print(" " * (timestamp.__len__() + 3), end="")
+            print(f"Running: {running_count} " + "█" * running_bar)
+            print()
+        
+        # Display system metrics history
+        print_section("System Metrics History")
+        
+        for entry in system_metrics_history:
+            timestamp = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry.get("timestamp", 0)))
+            cpu = entry.get("cpu_usage", 0)
+            memory = entry.get("memory_usage", 0)
+            disk = entry.get("disk_usage", 0)
+            
+            print(f"{timestamp} | CPU: {cpu:.1f}% | Memory: {memory:.1f}% | Disk: {disk:.1f}%")
+        
+        # Display summary
+        print_section("Analysis Summary")
+        
+        # Calculate trends
+        if len(container_history) > 1:
+            container_trend = container_history[-1].get("container_count", 0) - container_history[0].get("container_count", 0)
+            running_trend = container_history[-1].get("running_count", 0) - container_history[0].get("running_count", 0)
+            
+            if container_trend > 0:
+                print(f"Container count is increasing (+{container_trend})")
+            elif container_trend < 0:
+                print(f"Container count is decreasing ({container_trend})")
+            else:
+                print("Container count is stable")
+                
+            if running_trend > 0:
+                print(f"Running container count is increasing (+{running_trend})")
+            elif running_trend < 0:
+                print(f"Running container count is decreasing ({running_trend})")
+            else:
+                print("Running container count is stable")
+        
+        if len(system_metrics_history) > 1:
+            cpu_trend = system_metrics_history[-1].get("cpu_usage", 0) - system_metrics_history[0].get("cpu_usage", 0)
+            memory_trend = system_metrics_history[-1].get("memory_usage", 0) - system_metrics_history[0].get("memory_usage", 0)
+            disk_trend = system_metrics_history[-1].get("disk_usage", 0) - system_metrics_history[0].get("disk_usage", 0)
+            
+            print(f"CPU usage trend: {'+' if cpu_trend > 0 else ''}{cpu_trend:.1f}%")
+            print(f"Memory usage trend: {'+' if memory_trend > 0 else ''}{memory_trend:.1f}%")
+            print(f"Disk usage trend: {'+' if disk_trend > 0 else ''}{disk_trend:.1f}%")
+        
         input("\nPress Enter to continue...")
     
     def run(self) -> None:

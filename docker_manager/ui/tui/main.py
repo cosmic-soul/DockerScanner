@@ -92,7 +92,8 @@ class DockerTUI:
             "Containers",
             "Services",
             "Health",
-            "Templates"
+            "Templates",
+            "AI Recommendations"
         ])
         self.main_menu.add_key_command(py_cui.keys.KEY_ENTER, self._switch_view)
         
@@ -314,7 +315,8 @@ class DockerTUI:
             1: "containers",
             2: "services",
             3: "health",
-            4: "templates"
+            4: "templates", 
+            5: "ai_recommendations"
         }
         
         self.current_view = view_mapping.get(selected_view, "overview")
@@ -364,7 +366,12 @@ class DockerTUI:
             # Templates widgets
             "template_list": self.template_list,
             "template_actions": self.template_actions,
-            "template_details": self.template_details
+            "template_details": self.template_details,
+            
+            # AI Recommendations widgets
+            "ai_recommendation_list": self.ai_recommendation_list,
+            "ai_recommendation_actions": self.ai_recommendation_actions,
+            "ai_recommendation_details": self.ai_recommendation_details
         }
         
         # Define which widgets should be visible for each view
@@ -373,7 +380,8 @@ class DockerTUI:
             "containers": ["container_list", "container_actions", "visualization"],
             "services": ["service_status", "socket_status", "service_actions", "socket_actions"],
             "health": ["cpu", "memory", "disk", "container_resources"],
-            "templates": ["template_list", "template_actions", "template_details"]
+            "templates": ["template_list", "template_actions", "template_details"],
+            "ai_recommendations": ["ai_recommendation_list", "ai_recommendation_actions", "ai_recommendation_details"]
         }
         
         # Always keep the main menu visible
@@ -390,6 +398,8 @@ class DockerTUI:
             self.root.move_focus(self.cpu_widget)
         elif self.current_view == "templates":
             self.root.move_focus(self.template_list)
+        elif self.current_view == "ai_recommendations":
+            self.root.move_focus(self.ai_recommendation_list)
             
         # Update the root title to include the current view
         view_name = self.current_view.capitalize()
