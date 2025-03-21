@@ -1,0 +1,766 @@
+#!/usr/bin/env python3
+import docker
+import sys
+import os
+import time
+import argparse
+import subprocess
+import platform
+import shutil
+from tabulate import tabulate
+from datetime import datetime
+
+class DockerServiceManager:
+    """Manage Docker daemon and service operations."""
+    
+    def __init__(self):
+        """Initialize service manager with system detection."""
+        self.system = platform.system().lower()
+        self.is_admin = self._check_admin_privileges()
+        
+    def _check_admin_privileges(self):
+        """Check if script is running with administrative privileges."""
+        try:
+            if self.system == 'windows':
+                # Check Windows admin privileges
+                import ctypes
+                return ctypes.windll.shell32.IsUserAnAdmin() != 0
+            else:
+                # Check Unix-like sudo/root
+                return os.geteuid() == 0
+        except:
+            # Default to False if check fails
+            return False
+            
+    def _run_command(self, command, shell=False):
+        """Run system command and return result."""
+        try:
+            result = subprocess.run(
+                command, 
+                shell=shell, 
+                check=True, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.PIPE,
+                universal_newlines=True
+            )
+            return True, result.stdout
+        except subprocess.CalledProcessError as e:
+            return False, e.stderr
+        except Exception as e:
+            return False, str(e)
+    
+    def _get_service_commands(self):
+        """Get appropriate commands based on OS."""
+        if self.system == 'linux':
+            # Check which init system is used
+            if os.path.exists('/run/systemd/system'):
+                # systemd
+                return {
+                    'status': ['systemctl', 'status', 'docker'],
+                    'start': ['systemctl', 'start', 'docker'],
+                    'stop': ['systemctl', 'stop', 'docker'],
+                    'restart': ['systemctl', 'restart', 'docker'],
+                    'enable': ['systemctl', 'enable', 'docker'],
+                    'disable': ['systemctl', 'disable', 'docker'],
+                    'socket_enable': ['systemctl', 'enable', 'docker.socket'],
+                    'socket_disable': ['systemctl', 'disable', 'docker.socket'],
+                    'socket_start': ['systemctl', 'start', 'docker.socket'],
+                    'socket_stop': ['systemctl', 'stop', 'docker.socket'],
+                    'socket_status': ['systemctl', 'status', 'docker.socket']
+                }
+            elif os.path.exists('/etc/init.d/docker'):
+                # SysVinit
+                return {
+                    'status': ['service', 'docker', 'status'],
+                    'start': ['service', 'docker', 'start'],
+                    'stop': ['service', 'docker', 'stop'],
+                    'restart': ['service', 'docker', 'restart'],
+                    'enable': ['update-rc.d', 'docker', 'defaults'],
+                    'disable': ['update-rc.d', 'docker', 'disable'],
+                    # No direct socket management for SysVinit
+                    'socket_status': ['echo', 'Socket management not supported with SysVinit'],
+                    'socket_start': ['echo', 'Socket management not supported with SysVinit'],
+                    'socket_stop': ['echo', 'Socket management not supported with SysVinit'],
+                    'socket_enable': ['echo', 'Socket management not supported with SysVinit'],
+                    'socket_disable': ['echo', 'Socket management not supported with SysVinit']
+                }
+        elif self.system == 'darwin':  # macOS
+            return {
+                'status': ['launchctl', 'list', 'com.docker.docker'],
+                'start': ['open', '-a', 'Docker'],
+                'stop': ["osascript", "-e", 'quit app "Docker"'],
+                'restart': ["osascript", "-e", 'quit app "Docker"', "&&", "open", "-a", "Docker"],
+                # macOS uses launchd, Docker Desktop handles its own persistence
+                'enable': ['echo', 'Use Docker Desktop preferences to enable auto-start'],
+                'disable': ['echo', 'Use Docker Desktop preferences to disable auto-start'],
+                # No separate socket management for macOS
+                'socket_status': ['echo', 'Socket management not applicable on macOS'],
+                'socket_start': ['echo', 'Socket management not applicable on macOS'],
+                'socket_stop': ['echo', 'Socket management not applicable on macOS'],
+                'socket_enable': ['echo', 'Socket management not applicable on macOS'],
+                'socket_disable': ['echo', 'Socket management not applicable on macOS']
+            }
+        elif self.system == 'windows':
+            # Windows Service Management
+            return {
+                'status': ['sc', 'query', 'docker'],
+                'start': ['net', 'start', 'docker'],
+                'stop': ['net', 'stop', 'docker'],
+                'restart': ['net', 'stop', 'docker', '&&', 'net', 'start', 'docker'],
+                'enable': ['sc', 'config', 'docker', 'start=', 'auto'],
+                'disable': ['sc', 'config', 'docker', 'start=', 'disabled'],
+                # Windows uses named pipes instead of sockets
+                'socket_status': ['echo', 'Socket management not applicable on Windows'],
+                'socket_start': ['echo', 'Socket management not applicable on Windows'],
+                'socket_stop': ['echo', 'Socket management not applicable on Windows'],
+                'socket_enable': ['echo', 'Socket management not applicable on Windows'],
+                'socket_disable': ['echo', 'Socket management not applicable on Windows']
+            }
+        else:
+            # Default to commands that will show helpful error
+            return {
+                'status': ['echo', f'Service management not implemented for {self.system}'],
+                'start': ['echo', f'Service management not implemented for {self.system}'],
+                'stop': ['echo', f'Service management not implemented for {self.system}'],
+                'restart': ['echo', f'Service management not implemented for {self.system}'],
+                'enable': ['echo', f'Service management not implemented for {self.system}'],
+                'disable': ['echo', f'Service management not implemented for {self.system}'],
+                'socket_status': ['echo', f'Socket management not implemented for {self.system}'],
+                'socket_start': ['echo', f'Socket management not implemented for {self.system}'],
+                'socket_stop': ['echo', f'Socket management not implemented for {self.system}'],
+                'socket_enable': ['echo', f'Socket management not implemented for {self.system}'],
+                'socket_disable': ['echo', f'Socket management not implemented for {self.system}']
+            }
+            
+    def check_privileges(self):
+        """Check and inform about admin privileges."""
+        if not self.is_admin:
+            print("⚠️  Warning: Administrative privileges required for service management")
+            print("   Some operations may fail without proper permissions")
+            if self.system == 'linux' or self.system == 'darwin':
+                print("   Try running with 'sudo' or as root")
+            elif self.system == 'windows':
+                print("   Try running as Administrator")
+            return False
+        return True
+    
+    def get_status(self):
+        """Get Docker service status."""
+        print("Checking Docker service status...")
+        if not self.check_privileges():
+            print("Attempting to check status anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['status'])
+        
+        if success:
+            print("Docker service status:")
+            print(output)
+        else:
+            print(f"Error checking Docker service status: {output}")
+            
+        return success
+        
+    def start_service(self):
+        """Start Docker service."""
+        print("Starting Docker service...")
+        if not self.check_privileges():
+            print("Attempting to start service anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['start'])
+        
+        if success:
+            print("✓ Docker service started successfully")
+            # Verify service is running
+            time.sleep(2)  # Give it time to start
+            self.get_status()
+        else:
+            print(f"Error starting Docker service: {output}")
+            
+        return success
+        
+    def stop_service(self):
+        """Stop Docker service."""
+        print("Stopping Docker service...")
+        if not self.check_privileges():
+            print("Attempting to stop service anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['stop'])
+        
+        if success:
+            print("✓ Docker service stopped successfully")
+        else:
+            print(f"Error stopping Docker service: {output}")
+            
+        return success
+        
+    def restart_service(self):
+        """Restart Docker service."""
+        print("Restarting Docker service...")
+        if not self.check_privileges():
+            print("Attempting to restart service anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['restart'])
+        
+        if success:
+            print("✓ Docker service restarted successfully")
+            # Verify service is running
+            time.sleep(3)  # Give it time to restart
+            self.get_status()
+        else:
+            print(f"Error restarting Docker service: {output}")
+            
+        return success
+        
+    def enable_service(self):
+        """Enable Docker service to start at boot."""
+        print("Enabling Docker service to start at boot...")
+        if not self.check_privileges():
+            print("Attempting to enable service anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['enable'])
+        
+        if success:
+            print("✓ Docker service enabled successfully")
+        else:
+            print(f"Error enabling Docker service: {output}")
+            
+        return success
+        
+    def disable_service(self):
+        """Disable Docker service from starting at boot."""
+        print("Disabling Docker service from starting at boot...")
+        if not self.check_privileges():
+            print("Attempting to disable service anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['disable'])
+        
+        if success:
+            print("✓ Docker service disabled successfully")
+        else:
+            print(f"Error disabling Docker service: {output}")
+            
+        return success
+    
+    def get_socket_status(self):
+        """Get Docker socket status."""
+        print("Checking Docker socket status...")
+        if not self.check_privileges():
+            print("Attempting to check socket status anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['socket_status'])
+        
+        if success:
+            print("Docker socket status:")
+            print(output)
+        else:
+            print(f"Error checking Docker socket status: {output}")
+            
+        return success
+    
+    def start_socket(self):
+        """Start Docker socket."""
+        print("Starting Docker socket...")
+        if not self.check_privileges():
+            print("Attempting to start socket anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['socket_start'])
+        
+        if success:
+            print("✓ Docker socket started successfully")
+            # Verify socket is running
+            time.sleep(2)  # Give it time to start
+            self.get_socket_status()
+        else:
+            print(f"Error starting Docker socket: {output}")
+            
+        return success
+    
+    def stop_socket(self):
+        """Stop Docker socket."""
+        print("Stopping Docker socket...")
+        if not self.check_privileges():
+            print("Attempting to stop socket anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['socket_stop'])
+        
+        if success:
+            print("✓ Docker socket stopped successfully")
+        else:
+            print(f"Error stopping Docker socket: {output}")
+            
+        return success
+    
+    def enable_socket(self):
+        """Enable Docker socket to start at boot."""
+        print("Enabling Docker socket to start at boot...")
+        if not self.check_privileges():
+            print("Attempting to enable socket anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['socket_enable'])
+        
+        if success:
+            print("✓ Docker socket enabled successfully")
+        else:
+            print(f"Error enabling Docker socket: {output}")
+            
+        return success
+    
+    def disable_socket(self):
+        """Disable Docker socket from starting at boot."""
+        print("Disabling Docker socket from starting at boot...")
+        if not self.check_privileges():
+            print("Attempting to disable socket anyway...")
+            
+        commands = self._get_service_commands()
+        success, output = self._run_command(commands['socket_disable'])
+        
+        if success:
+            print("✓ Docker socket disabled successfully")
+        else:
+            print(f"Error disabling Docker socket: {output}")
+            
+        return success
+
+
+class DockerManager:
+    """Docker container management utility with enhanced functionality."""
+    
+    def __init__(self):
+        """Initialize the Docker client with error handling."""
+        try:
+            self.client = docker.from_env()
+            # Test connection
+            self.client.ping()
+        except docker.errors.DockerException as e:
+            print(f"Error connecting to Docker daemon: {e}")
+            print("Make sure Docker is running and you have proper permissions.")
+            
+            # Offer to start Docker service
+            if input("Would you like to try starting the Docker service? (y/n): ").lower() == 'y':
+                service_manager = DockerServiceManager()
+                service_manager.start_service()
+                # Try connecting again
+                try:
+                    time.sleep(5)  # Wait for Docker to start
+                    self.client = docker.from_env()
+                    self.client.ping()
+                    print("✓ Successfully connected to Docker daemon")
+                except docker.errors.DockerException as e:
+                    print(f"Still unable to connect to Docker daemon: {e}")
+                    sys.exit(1)
+            else:
+                sys.exit(1)
+            
+    def list_containers(self, verbose=False):
+        """List all containers with improved formatting and details."""
+        try:
+            containers = self.client.containers.list(all=True)
+            
+            if not containers:
+                print("No containers found.")
+                return
+            
+            headers = ["ID", "Name", "Image", "Status", "Created", "Ports"]
+            if verbose:
+                headers.extend(["Command", "Labels"])
+                
+            rows = []
+            for container in containers:
+                # Basic info
+                row = [
+                    container.short_id,
+                    container.name,
+                    container.image.tags[0] if container.image.tags else "<none>",
+                    container.status,
+                    datetime.fromtimestamp(container.attrs['Created']).strftime('%Y-%m-%d %H:%M'),
+                ]
+                
+                # Port mapping
+                ports = []
+                for port, mappings in container.attrs.get('HostConfig', {}).get('PortBindings', {}).items():
+                    if mappings:
+                        for mapping in mappings:
+                            ports.append(f"{mapping.get('HostIp', '')}:{mapping.get('HostPort', '')}->{port}")
+                
+                row.append("\n".join(ports) if ports else "")
+                
+                # Verbose info
+                if verbose:
+                    row.append(container.attrs.get('Config', {}).get('Cmd', [""])[0])
+                    
+                    # Get key labels
+                    labels = container.attrs.get('Config', {}).get('Labels', {})
+                    label_str = "\n".join([f"{k}={v}" for k, v in labels.items()])
+                    row.append(label_str)
+                
+                rows.append(row)
+            
+            print(tabulate(rows, headers=headers, tablefmt="grid"))
+            
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+    
+    def get_container(self, container_id):
+        """Get container by ID with better error handling."""
+        try:
+            return self.client.containers.get(container_id)
+        except docker.errors.NotFound:
+            print(f"Container {container_id} not found.")
+            return None
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+            return None
+    
+    def start_container(self, container_id):
+        """Start a specific container with enhanced feedback."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            if container.status == "running":
+                print(f"Container {container.name} ({container.short_id}) is already running.")
+            else:
+                print(f"Starting container {container.name} ({container.short_id})...")
+                container.start()
+                # Verify the container actually started
+                container.reload()
+                if container.status == "running":
+                    print(f"✓ Container {container.name} ({container.short_id}) started successfully.")
+                else:
+                    print(f"⚠ Container started but status is {container.status}.")
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error starting container: {e}")
+    
+    def start_all_containers(self):
+        """Start all containers that are not running with progress tracking."""
+        try:
+            containers = self.client.containers.list(all=True, filters={"status": "exited"})
+            if not containers:
+                print("No stopped containers found.")
+                return
+                
+            print(f"Starting {len(containers)} containers...")
+            started = 0
+            for container in containers:
+                try:
+                    print(f"Starting {container.name} ({container.short_id})...", end="")
+                    container.start()
+                    container.reload()  # Refresh container data
+                    if container.status == "running":
+                        print(" ✓")
+                        started += 1
+                    else:
+                        print(f" ⚠ (Status: {container.status})")
+                except Exception as e:
+                    print(f" ✗ (Error: {e})")
+            
+            print(f"Started {started} of {len(containers)} containers.")
+            
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+    
+    def stop_container(self, container_id, timeout=10):
+        """Stop a specific container with timeout option."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            if container.status != "running":
+                print(f"Container {container.name} ({container.short_id}) is not running (status: {container.status}).")
+            else:
+                print(f"Stopping container {container.name} ({container.short_id}) with {timeout}s timeout...")
+                container.stop(timeout=timeout)
+                container.reload()
+                print(f"✓ Container {container.name} ({container.short_id}) stopped successfully.")
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error stopping container: {e}")
+    
+    def stop_all_containers(self, timeout=10):
+        """Stop all running containers with timeout option."""
+        try:
+            containers = self.client.containers.list(filters={"status": "running"})
+            if not containers:
+                print("No running containers to stop.")
+                return
+                
+            print(f"Stopping {len(containers)} containers (timeout: {timeout}s)...")
+            stopped = 0
+            for container in containers:
+                try:
+                    print(f"Stopping {container.name} ({container.short_id})...", end="")
+                    container.stop(timeout=timeout)
+                    container.reload()
+                    if container.status != "running":
+                        print(" ✓")
+                        stopped += 1
+                    else:
+                        print(" ⚠ Container still appears to be running.")
+                except Exception as e:
+                    print(f" ✗ (Error: {e})")
+            
+            print(f"Stopped {stopped} of {len(containers)} containers.")
+            
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+    
+    def restart_container(self, container_id, timeout=10):
+        """Restart a specific container with timeout option."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            print(f"Restarting container {container.name} ({container.short_id})...")
+            container.restart(timeout=timeout)
+            container.reload()
+            if container.status == "running":
+                print(f"✓ Container {container.name} ({container.short_id}) restarted successfully.")
+            else:
+                print(f"⚠ Container restarted but status is {container.status}.")
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error restarting container: {e}")
+    
+    def remove_container(self, container_id, force=False):
+        """Remove a specific container with force option."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            if container.status == "running" and not force:
+                print(f"Container {container.name} ({container.short_id}) is running.")
+                confirm = input("Do you want to force remove it? (y/n): ").strip().lower()
+                if confirm != 'y':
+                    print("Operation cancelled.")
+                    return
+                force = True
+                
+            print(f"Removing container {container.name} ({container.short_id}){' (forced)' if force else ''}...")
+            container.remove(force=force)
+            print(f"✓ Container removed successfully.")
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error removing container: {e}")
+    
+    def view_logs(self, container_id, tail=100):
+        """View logs of a specific container."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            print(f"Logs for container {container.name} ({container.short_id}):")
+            print("-" * 80)
+            for line in container.logs(tail=tail, stream=True, timestamps=True):
+                print(line.decode().strip())
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error viewing logs: {e}")
+    
+    def container_stats(self, container_id):
+        """View real-time stats of a container."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        if container.status != "running":
+            print(f"Container {container.name} ({container.short_id}) is not running.")
+            return
+            
+        try:
+            print(f"Displaying stats for {container.name} ({container.short_id}). Press Ctrl+C to exit.")
+            print("-" * 80)
+            
+            # Get stats stream
+            stats_stream = container.stats(stream=True, decode=True)
+            
+            try:
+                for stat in stats_stream:
+                    # Extract useful stats
+                    cpu_stats = stat.get('cpu_stats', {})
+                    memory_stats = stat.get('memory_stats', {})
+                    
+                    # Calculate CPU usage percentage
+                    cpu_delta = cpu_stats.get('cpu_usage', {}).get('total_usage', 0) - \
+                                stat.get('precpu_stats', {}).get('cpu_usage', {}).get('total_usage', 0)
+                    system_delta = cpu_stats.get('system_cpu_usage', 0) - \
+                                  stat.get('precpu_stats', {}).get('system_cpu_usage', 0)
+                    
+                    cpu_percent = 0.0
+                    if system_delta > 0 and cpu_delta > 0:
+                        cpu_percent = (cpu_delta / system_delta) * cpu_stats.get('online_cpus', 1) * 100.0
+                    
+                    # Memory usage
+                    mem_usage = memory_stats.get('usage', 0)
+                    mem_limit = memory_stats.get('limit', 1)
+                    mem_percent = (mem_usage / mem_limit) * 100.0
+                    
+                    # Display stats
+                    os.system('clear' if os.name == 'posix' else 'cls')  # Clear screen
+                    print(f"Stats for {container.name} ({container.short_id}) - Press Ctrl+C to exit")
+                    print("-" * 80)
+                    print(f"CPU Usage: {cpu_percent:.2f}%")
+                    print(f"Memory Usage: {mem_usage / (1024 * 1024):.2f}MB / {mem_limit / (1024 * 1024):.2f}MB ({mem_percent:.2f}%)")
+                    
+                    # Network stats
+                    net_stats = stat.get('networks', {})
+                    if net_stats:
+                        print("\nNetwork I/O:")
+                        for interface, data in net_stats.items():
+                            rx_bytes = data.get('rx_bytes', 0) / (1024 * 1024)
+                            tx_bytes = data.get('tx_bytes', 0) / (1024 * 1024)
+                            print(f"  {interface}: RX {rx_bytes:.2f}MB, TX {tx_bytes:.2f}MB")
+                    
+                    time.sleep(1)  # Update frequency
+                    
+            except KeyboardInterrupt:
+                print("\nExiting stats view.")
+                
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error viewing stats: {e}")
+
+    def prune_containers(self):
+        """Remove all stopped containers."""
+        try:
+            print("Removing all stopped containers...")
+            result = self.client.containers.prune()
+            removed = result.get('ContainersDeleted', [])
+            
+            if removed:
+                print(f"✓ Successfully removed {len(removed)} containers.")
+                print("Removed container IDs:")
+                for container_id in removed:
+                    print(f"  - {container_id[:12]}")
+            else:
+                print("No containers were removed.")
+                
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+
+    def inspect_container(self, container_id):
+        """Get detailed information about a container."""
+        container = self.get_container(container_id)
+        if not container:
+            return
+            
+        try:
+            print(f"Detailed information for container {container.name} ({container.short_id}):")
+            print("-" * 80)
+            
+            # Extract useful information from container attributes
+            created = datetime.fromtimestamp(container.attrs['Created']).strftime('%Y-%m-%d %H:%M:%S')
+            state = container.attrs.get('State', {})
+            config = container.attrs.get('Config', {})
+            host_config = container.attrs.get('HostConfig', {})
+            network = container.attrs.get('NetworkSettings', {})
+            
+            # Format and display information
+            print(f"Name: {container.name}")
+            print(f"ID: {container.id}")
+            print(f"Created: {created}")
+            print(f"Status: {container.status}")
+            
+            print("\nState:")
+            print(f"  Running: {state.get('Running', False)}")
+            print(f"  Started At: {state.get('StartedAt', 'N/A')}")
+            print(f"  Finished At: {state.get('FinishedAt', 'N/A')}")
+            print(f"  Exit Code: {state.get('ExitCode', 'N/A')}")
+            print(f"  Error: {state.get('Error', 'None')}")
+            
+            print("\nImage:")
+            print(f"  {container.image.tags[0] if container.image.tags else container.image.id}")
+            
+            print("\nCommand:")
+            print(f"  {' '.join(config.get('Cmd', ['None']))}")
+            
+            print("\nEnvironment Variables:")
+            env_vars = config.get('Env', [])
+            for env in env_vars:
+                # Split on first = to handle values that contain =
+                parts = env.split('=', 1)
+                if len(parts) == 2 and not any(secret in parts[0].lower() for secret in ['pass', 'key', 'secret', 'token', 'auth']):
+                    print(f"  {parts[0]}={parts[1]}")
+                else:
+                    print(f"  {parts[0]}=<value hidden>")
+            
+            print("\nVolumes:")
+            volumes = host_config.get('Binds', [])
+            if volumes:
+                for volume in volumes:
+                    print(f"  {volume}")
+            else:
+                print("  None")
+            
+            print("\nPort Mappings:")
+            port_bindings = host_config.get('PortBindings', {})
+            if port_bindings:
+                for port, bindings in port_bindings.items():
+                    for binding in bindings:
+                        host_ip = binding.get('HostIp', '')
+                        host_port = binding.get('HostPort', '')
+                        print(f"  {host_ip}:{host_port}->{port}")
+            else:
+                print("  None")
+            
+            print("\nNetworks:")
+            networks = network.get('Networks', {})
+            for net_name, net_config in networks.items():
+                print(f"  {net_name}:")
+                print(f"    IP Address: {net_config.get('IPAddress', 'N/A')}")
+                print(f"    Gateway: {net_config.get('Gateway', 'N/A')}")
+                print(f"    MAC Address: {net_config.get('MacAddress', 'N/A')}")
+            
+            print("\nRestart Policy:")
+            restart_policy = host_config.get('RestartPolicy', {})
+            name = restart_policy.get('Name', 'none')
+            max_retry = restart_policy.get('MaximumRetryCount', 0)
+            if name == 'on-failure':
+                print(f"  {name} (max retry: {max_retry})")
+            else:
+                print(f"  {name}")
+            
+            print("\nLabels:")
+            labels = config.get('Labels', {})
+            if labels:
+                for k, v in labels.items():
+                    print(f"  {k}: {v}")
+            else:
+                print("  None")
+                
+        except docker.errors.APIError as e:
+            print(f"Docker API error: {e}")
+        except Exception as e:
+            print(f"Error inspecting container: {e}")
+
+
+def print_service_menu():
