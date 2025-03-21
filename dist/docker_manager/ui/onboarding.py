@@ -284,7 +284,6 @@ class OnboardingManager:
         print("Available commands:")
         print("- list: Show all containers (running and stopped)")
         print("- logs: View logs for a specific container")
-        print("- visualize: Interactive animation of container lifecycle states")
         print()
         print("Note: To manage individual containers (start, stop, etc.), use Docker CLI directly.")
         
@@ -529,10 +528,6 @@ class OnboardingManager:
             "container_logs": (
                 not self.is_topic_completed("containers"),
                 "Tip: Container logs are helpful for troubleshooting issues."
-            ),
-            "container_visualize": (
-                not self.is_topic_completed("containers"),
-                "Tip: The container visualization shows real-time state transitions with animation."
             ),
             
             # Template suggestions

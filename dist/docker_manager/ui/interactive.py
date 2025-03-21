@@ -8,7 +8,6 @@ from typing import List, Dict, Callable, Any, Optional
 
 from ..core.service_manager import DockerServiceManager
 from ..core.health_report import HealthReport
-from ..core.container_visualization import ContainerVisualizer
 from ..templates.environment_templates import TemplateManager
 from ..utils.display import COLORS, get_terminal_size, show_banner, print_status, print_section
 from .onboarding import OnboardingManager
@@ -77,7 +76,6 @@ class InteractiveConsole:
                 "options": [
                     {"key": "1", "desc": "List Containers", "action": self._list_containers},
                     {"key": "2", "desc": "View Container Logs", "action": self._view_container_logs},
-                    {"key": "3", "desc": "Visualize Container Lifecycle", "action": self._visualize_containers},
                     {"key": "b", "desc": "Back to Main Menu", "action": lambda: self._change_menu("main")}
                 ]
             },
@@ -363,47 +361,6 @@ class InteractiveConsole:
         )
         
         input("\nPress Enter to continue...")
-        
-    def _visualize_containers(self) -> None:
-        """Visualize container lifecycle with animations."""
-        print_section("Container Lifecycle Visualization")
-        
-        try:
-            # Check for required libraries
-            try:
-                import blessed
-            except ImportError:
-                print("The 'blessed' library is required for visualization.")
-                print("You can install it with: pip install blessed")
-                input("\nPress Enter to continue...")
-                return
-                
-            # Initialize the visualizer
-            visualizer = ContainerVisualizer(demo_mode=self.demo_mode)
-            
-            # Show visualization
-            print("Starting container visualization...")
-            print("This will open an animated view of container states.")
-            print("Press 'q' to exit the visualization when done.")
-            print()
-            
-            # Track usage for onboarding system
-            self.onboarding.maybe_show_suggestion("container", "visualize")
-            
-            input("Press Enter to start visualization...")
-            
-            # Try to run the full visualization
-            success = visualizer.show_visualization()
-            
-            # If the full visualization fails, try the simpler version
-            if not success:
-                print("\nFalling back to simple visualization mode...")
-                visualizer.show_simple_visualization()
-                
-        except Exception as e:
-            print(f"Error in visualization: {e}")
-            
-        input("\nPress Enter to return to menu...")
         
     # System information actions
     def _show_docker_info(self) -> None:

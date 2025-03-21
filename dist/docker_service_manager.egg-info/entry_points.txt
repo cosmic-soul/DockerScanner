@@ -1,0 +1,3 @@
+[console_scripts]
+docker-service-manager = docker_service_manager:main
+dsm = docker_service_manager:main
