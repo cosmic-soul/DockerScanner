@@ -133,3 +133,14 @@ def run_command(command: List[str], check: bool = False) -> Tuple[bool, str]:
             return False, result.stderr
     except Exception as e:
         return False, str(e)
+def check_platform_requirements():
+    """Check platform-specific requirements."""
+    system = platform.system().lower()
+    if system == 'windows':
+        if not ctypes.windll.shell32.IsUserAnAdmin():
+            print("Warning: Running without admin privileges on Windows")
+            print("Some features may not work correctly")
+    elif system in ('linux', 'darwin'):
+        if os.geteuid() != 0:
+            print("Warning: Running without root privileges")
+            print("Some features may not work correctly")

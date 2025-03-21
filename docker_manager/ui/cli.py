@@ -230,3 +230,12 @@ def process_args(args: argparse.Namespace) -> int:
         return 1
     
     return 0 if success else 1
+def validate_input(args):
+    """Validate command line arguments."""
+    if args.command == 'service' and args.action not in ['start', 'stop', 'status', 'restart']:
+        print(f"Invalid service action: {args.action}")
+        print("Valid actions: start, stop, status, restart")
+        sys.exit(1)
+    
+    if args.demo and args.command in ['template', 'create']:
+        print("Warning: Template creation not fully supported in demo mode")

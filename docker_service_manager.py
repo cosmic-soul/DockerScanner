@@ -38,6 +38,14 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nOperation cancelled by user")
         sys.exit(130)  # Standard exit code for SIGINT
+    except ModuleNotFoundError as e:
+        print(f"\nError: Required module not found - {e}")
+        print("Try installing requirements with: pip install -r requirements.txt")
+        sys.exit(2)
+    except PermissionError as e:
+        print("\nError: Administrative privileges required")
+        print("Try running with sudo (Linux/macOS) or as Administrator (Windows)")
+        sys.exit(3)
     except Exception as e:
-        print(f"\nError: {e}")
+        print(f"\nError: Unexpected error - {e}")
         sys.exit(1)
