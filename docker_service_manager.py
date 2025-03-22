@@ -7,6 +7,7 @@ A cross-platform Python CLI tool for managing Docker daemon services
 with enhanced user experience and cross-system compatibility.
 """
 import sys
+import os
 
 try:
     from docker_service_manager import main
@@ -15,6 +16,14 @@ try:
         main()
         
 except ModuleNotFoundError:
+    print("Docker Service Manager module not found.")
+    print("Looking for alternative execution paths...")
+    
+    # Try to locate the proper path based on current directory
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+    
     try:
         # Alternative import path if module is not properly installed
         from docker_manager.utils.display import show_banner
@@ -49,6 +58,7 @@ except ModuleNotFoundError:
             except ModuleNotFoundError as e:
                 print(f"\nError: Required module not found - {e}")
                 print("Try installing requirements with: pip install -r requirements.txt")
+                print("\nYou may need to run the reinstall script: ./reinstall.sh")
                 sys.exit(2)
             except PermissionError as e:
                 print("\nError: Administrative privileges required")
@@ -59,4 +69,5 @@ except ModuleNotFoundError:
                 sys.exit(1)
     except Exception as e:
         print(f"Error initializing Docker Service Manager: {e}")
+        print("Try running the reinstall script: ./reinstall.sh")
         sys.exit(1)

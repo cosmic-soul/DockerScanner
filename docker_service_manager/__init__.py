@@ -16,22 +16,33 @@ def main():
     # Import these locally to reduce startup time
     import sys
     
-    # Show banner
-    show_banner()
-    
-    # Set up command line argument parsing
-    parser = setup_argparse()
-    args = parser.parse_args()
-    
-    # Check requirements (Docker SDK, tabulate, etc.)
-    check_requirements()
-    
-    # Process arguments and execute requested commands
-    # This will handle TUI and interactive modes
-    exit_code = process_args(args)
-    
-    # Exit with appropriate code (0 for success, non-zero for error)
-    sys.exit(exit_code)
+    try:
+        # Show banner
+        show_banner()
+        
+        # Set up command line argument parsing
+        parser = setup_argparse()
+        args = parser.parse_args()
+        
+        # Check requirements (Docker SDK, tabulate, etc.)
+        check_requirements()
+        
+        # Process arguments and execute requested commands
+        # This will handle TUI and interactive modes
+        exit_code = process_args(args)
+        
+        # Exit with appropriate code (0 for success, non-zero for error)
+        sys.exit(exit_code)
+    except KeyboardInterrupt:
+        print("\nOperation cancelled by user")
+        sys.exit(130)  # Standard exit code for SIGINT
+    except ModuleNotFoundError as e:
+        print(f"\nError: Required module not found - {e}")
+        print("Try installing requirements with: pip install -r requirements.txt")
+        sys.exit(2)
+    except Exception as e:
+        print(f"\nError: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

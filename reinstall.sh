@@ -12,6 +12,9 @@ mkdir -p ~/.local/bin
 echo "Uninstalling previous versions if they exist..."
 pip uninstall -y docker-service-manager
 
+echo "Cleaning any leftover files and egg-info directories..."
+rm -rf build/ dist/ *.egg-info/
+
 echo "Installing in development mode to ensure proper module paths..."
 pip install -e .
 
