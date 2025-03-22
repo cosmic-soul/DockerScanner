@@ -4,7 +4,7 @@ modules = ["python-3.11", "python3"]
 channel = "stable-24_05"
 
 [workflows]
-runButton = "Full Test Suite"
+runButton = "Run Docker Service Manager"
 
 [[workflows.workflow]]
 name = "Project"
@@ -90,6 +90,15 @@ args = "flake8 docker_manager/"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "mypy docker_manager/"
+
+[[workflows.workflow]]
+name = "Run Docker Service Manager"
+author = 18984519
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python docker_service_manager.py --interactive --demo"
 
 [deployment]
 run = ["sh", "-c", "python docker_service_manager.py --interactive --demo"]

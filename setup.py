@@ -11,6 +11,7 @@ setup(
         "matplotlib>=3.10.1",
         "psutil>=7.0.0",
         "py-cui>=0.1.6",
+        "setuptools>=77.0.3",
         "tabulate>=0.9.0",
         "python-dateutil>=2.8.2",
     ],

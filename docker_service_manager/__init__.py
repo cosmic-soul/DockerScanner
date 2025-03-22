@@ -1,8 +1,8 @@
 
 """
-Docker Service Manager - Main Module
+Docker Service Manager - Package initialization
 
-This module serves as the entry point for the Docker Service Manager application.
+This module provides the entry point for the Docker Service Manager application.
 """
 
 import sys

@@ -68,5 +68,6 @@ except ModuleNotFoundError:
                 sys.exit(1)
     except Exception as e:
         print(f"Error initializing Docker Service Manager: {e}")
+        print("\nPlease ensure the package is installed correctly.")
         print("Try running the reinstall script: ./reinstall.sh")
         sys.exit(1)
