@@ -8,6 +8,9 @@ from docker_manager.utils.system import check_requirements
 from docker_manager.ui.cli import setup_argparse, process_args
 from docker_manager.ui.interactive import InteractiveConsole
 
+# Version information
+__version__ = "1.0.0"
+
 def main():
     """Main entry point for the application."""
     # Import these locally to reduce startup time
@@ -30,5 +33,5 @@ def main():
     # Exit with appropriate code (0 for success, non-zero for error)
     sys.exit(exit_code)
 
-# Version information
-__version__ = "1.0.0"
+if __name__ == "__main__":
+    main()

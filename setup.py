@@ -1,4 +1,3 @@
-
 from setuptools import setup, find_packages
 
 setup(
@@ -12,6 +11,7 @@ setup(
         "psutil>=7.0.0",
         "py-cui>=0.1.6",
         "tabulate>=0.9.0",
+        "python-dateutil>=2.8.2",
     ],
     entry_points={
         'console_scripts': [

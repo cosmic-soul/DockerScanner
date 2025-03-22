@@ -576,8 +576,20 @@ class DockerServiceManager:
             # Prepare table data
             table_data = []
             for container in containers:
-                # Format container created time
-                created = datetime.fromtimestamp(container.attrs['Created'])
+                # Format container created time - handle different timestamp formats
+                created_timestamp = container.attrs['Created']
+                # Check if created_timestamp is a string (ISO format) or integer (Unix timestamp)
+                if isinstance(created_timestamp, str):
+                    # Parse ISO format timestamp
+                    from datetime import datetime
+                    import dateutil.parser
+                    try:
+                        created = dateutil.parser.parse(created_timestamp)
+                    except Exception:
+                        created = datetime.now()  # Fallback
+                else:
+                    # Handle as Unix timestamp
+                    created = datetime.fromtimestamp(created_timestamp)
                 created_str = created.strftime('%Y-%m-%d %H:%M:%S')
                 
                 # Get status with color
