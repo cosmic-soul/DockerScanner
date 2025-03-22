@@ -1,0 +1,62 @@
+cosmicsoul@fedora:~/Desktop/underDevelopment /dockerTools/DockerScanner$ ls
+app.zip                          install.py           requirements.txt
+attached_assets                  install_unix.sh      setup.py
+build_package.py                 install_windows.bat  test_health_report.json
+docker_manager                   LICENSE              test_health_report.py
+docker_service_manager           MANIFEST.in          tests
+docker_service_manager.egg-info  pyproject.toml       uv.lock
+docker_service_manager.py        README.md            windows_installer.py
+docker_service_manager.zip       reinstall.sh
+generated-icon.png               replit.nix
+cosmicsoul@fedora:~/Desktop/underDevelopment /dockerTools/DockerScanner$ pip install -e .
+Defaulting to user installation because normal site-packages is not writeable
+Obtaining file:///home/cosmicsoul/Desktop/underDevelopment%20/dockerTools/DockerScanner
+  Installing build dependencies ... done
+  Checking if build backend supports build_editable ... done
+  Getting requirements to build editable ... done
+  Preparing editable metadata (pyproject.toml) ... done
+Requirement already satisfied: blessed>=1.20.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (1.20.0)
+Requirement already satisfied: docker>=7.1.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (7.1.0)
+Requirement already satisfied: matplotlib>=3.10.1 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (3.10.1)
+Requirement already satisfied: psutil>=7.0.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (7.0.0)
+Requirement already satisfied: py-cui>=0.1.6 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (0.1.6)
+Requirement already satisfied: setuptools>=77.0.3 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (77.0.3)
+Requirement already satisfied: tabulate>=0.9.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker-service-manager==1.0.0) (0.9.0)
+Requirement already satisfied: wcwidth>=0.1.4 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from blessed>=1.20.0->docker-service-manager==1.0.0) (0.2.13)
+Requirement already satisfied: six>=1.9.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from blessed>=1.20.0->docker-service-manager==1.0.0) (1.17.0)
+Requirement already satisfied: requests>=2.26.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker>=7.1.0->docker-service-manager==1.0.0) (2.32.3)
+Requirement already satisfied: urllib3>=1.26.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from docker>=7.1.0->docker-service-manager==1.0.0) (2.3.0)
+Requirement already satisfied: contourpy>=1.0.1 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (1.3.1)
+Requirement already satisfied: cycler>=0.10 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (0.12.1)
+Requirement already satisfied: fonttools>=4.22.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (4.56.0)
+Requirement already satisfied: kiwisolver>=1.3.1 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (1.4.8)
+Requirement already satisfied: numpy>=1.23 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (2.2.4)
+Requirement already satisfied: packaging>=20.0 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (24.2)
+Requirement already satisfied: pillow>=8 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (11.1.0)
+Requirement already satisfied: pyparsing>=2.3.1 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (3.2.1)
+Requirement already satisfied: python-dateutil>=2.7 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from matplotlib>=3.10.1->docker-service-manager==1.0.0) (2.9.0.post0)
+Requirement already satisfied: charset-normalizer<4,>=2 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from requests>=2.26.0->docker>=7.1.0->docker-service-manager==1.0.0) (3.4.1)
+Requirement already satisfied: idna<4,>=2.5 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from requests>=2.26.0->docker>=7.1.0->docker-service-manager==1.0.0) (3.10)
+Requirement already satisfied: certifi>=2017.4.17 in /home/cosmicsoul/.local/lib/python3.13/site-packages (from requests>=2.26.0->docker>=7.1.0->docker-service-manager==1.0.0) (2025.1.31)
+Building wheels for collected packages: docker-service-manager
+  Building editable for docker-service-manager (pyproject.toml) ... done
+  Created wheel for docker-service-manager: filename=docker_service_manager-1.0.0-0.editable-py3-none-any.whl size=7793 sha256=e9fae4c32e0fb02c49e2e24e2a9c523d37234f6e519123e9dc1c22d3b9469503
+  Stored in directory: /tmp/pip-ephem-wheel-cache-eq9fqwux/wheels/cf/0d/ee/a26080beba7ae4e536c7dc4848ca1c6daf579ff5f28d093c56
+Successfully built docker-service-manager
+Installing collected packages: docker-service-manager
+  Attempting uninstall: docker-service-manager
+    Found existing installation: docker-service-manager 1.0.0
+    Uninstalling docker-service-manager-1.0.0:
+      Successfully uninstalled docker-service-manager-1.0.0
+Successfully installed docker-service-manager-1.0.0
+cosmicsoul@fedora:~/Desktop/underDevelopment /dockerTools/DockerScanner$ dsm
+Traceback (most recent call last):
+  File "/home/cosmicsoul/.local/bin/dsm", line 5, in <module>
+    from docker_service_manager import main
+ModuleNotFoundError: No module named 'docker_service_manager'
+cosmicsoul@fedora:~/Desktop/underDevelopment /dockerTools/DockerScanner$ dsm
+Traceback (most recent call last):
+  File "/home/cosmicsoul/.local/bin/dsm", line 5, in <module>
+    from docker_service_manager import main
+ModuleNotFoundError: No module named 'docker_service_manager'
+cosmicsoul@fedora:~/Desktop/underDevelopment /dockerTools/DockerScanner$ 
