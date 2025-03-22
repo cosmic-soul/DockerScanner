@@ -5,6 +5,9 @@ setup(
     name="docker-service-manager",
     version="1.0.0",
     packages=find_packages(include=['docker_manager', 'docker_manager.*', 'docker_service_manager']),
+    package_data={
+        'docker_manager': ['templates/*.yaml', 'templates/*.json'],
+    },
     install_requires=[
         "blessed>=1.20.0",
         "docker>=7.1.0",
