@@ -1,13 +1,12 @@
 
 #!/usr/bin/env python3
 """
-Docker Service Manager - Main entry point
-
-A cross-platform Python CLI tool for managing Docker daemon services
-with enhanced user experience and cross-system compatibility.
+Docker Service Manager - Main script
+This is a wrapper script that imports and runs the main function from the docker_service_manager package.
 """
-import sys
+
 import os
+import sys
 
 try:
     from docker_service_manager import main
@@ -48,7 +47,7 @@ except ModuleNotFoundError:
             
             # Exit with appropriate code (0 for success, non-zero for error)
             sys.exit(exit_code)
-
+            
         if __name__ == "__main__":
             try:
                 main()

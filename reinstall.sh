@@ -11,6 +11,12 @@ echo "==============================================="
 echo "Creating required directories..."
 mkdir -p docker_service_manager
 
+# Make sure docker_service_manager has an __init__.py file
+if [ ! -f docker_service_manager/__init__.py ]; then
+    echo "Creating docker_service_manager/__init__.py"
+    touch docker_service_manager/__init__.py
+fi
+
 # Uninstall previous versions if they exist
 echo "Uninstalling previous versions if they exist..."
 pip uninstall -y docker-service-manager
@@ -19,6 +25,7 @@ pip uninstall -y docker-service-manager
 echo "Cleaning any leftover files and egg-info directories..."
 rm -rf *.egg-info
 rm -rf build/ dist/
+rm -rf docker_service_manager.egg-info/
 
 # Install in development mode to ensure proper module paths
 echo "Installing in development mode to ensure proper module paths..."
@@ -26,7 +33,7 @@ pip install -e .
 
 # Test the installation
 echo "Testing installation..."
-if python -c "from docker_service_manager import main; print('Module import successful!')" 2>/dev/null; then
+if python -c "import docker_service_manager; print('Module import successful!')" 2>/dev/null; then
     echo ""
     echo "Installation completed successfully!"
     echo "You can now run Docker Service Manager by typing:"

@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 setup(
     name="docker-service-manager",
     version="1.0.0",
-    packages=find_packages(),
+    packages=find_packages(include=['docker_manager', 'docker_manager.*', 'docker_service_manager']),
     install_requires=[
         "blessed>=1.20.0",
         "docker>=7.1.0",

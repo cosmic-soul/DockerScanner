@@ -30,6 +30,7 @@ def main():
     # Exit with appropriate code (0 for success, non-zero for error)
     sys.exit(exit_code)
 
+# Allow running this module directly
 if __name__ == "__main__":
     try:
         main()
@@ -39,7 +40,6 @@ if __name__ == "__main__":
     except ModuleNotFoundError as e:
         print(f"\nError: Required module not found - {e}")
         print("Try installing requirements with: pip install -r requirements.txt")
-        print("\nYou may need to run the reinstall script: ./reinstall.sh")
         sys.exit(2)
     except PermissionError as e:
         print("\nError: Administrative privileges required")
