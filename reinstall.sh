@@ -1,33 +1,43 @@
 
 #!/bin/bash
+# Reinstallation script for Docker Service Manager
+# This script uninstalls any existing installation and reinstalls it
 
 echo "==============================================="
 echo "Docker Service Manager - Reinstallation"
 echo "==============================================="
-echo ""
 
+# Create required directories if they don't exist
 echo "Creating required directories..."
-mkdir -p ~/.local/bin
+mkdir -p docker_service_manager
 
+# Uninstall previous versions if they exist
 echo "Uninstalling previous versions if they exist..."
 pip uninstall -y docker-service-manager
 
+# Clean any leftover files and egg-info directories
 echo "Cleaning any leftover files and egg-info directories..."
-rm -rf build/ dist/ *.egg-info/
+rm -rf *.egg-info
+rm -rf build/ dist/
 
+# Install in development mode to ensure proper module paths
 echo "Installing in development mode to ensure proper module paths..."
 pip install -e .
 
+# Test the installation
 echo "Testing installation..."
-if python -c "from docker_service_manager import main; print('Module import successful!')" &> /dev/null; then
-    echo "Module import successful!"
+if python -c "from docker_service_manager import main; print('Module import successful!')" 2>/dev/null; then
     echo ""
     echo "Installation completed successfully!"
     echo "You can now run Docker Service Manager by typing:"
     echo "  docker-service-manager"
     echo "  dsm"
+    echo "==============================================="
 else
-    echo "ERROR: Module import failed!"
-    echo "Please check your installation and try again."
+    echo ""
+    echo "Installation failed. The module could not be imported."
+    echo "Try running the installation manually:"
+    echo "  pip install -e ."
+    echo "==============================================="
+    exit 1
 fi
-echo "==============================================="
