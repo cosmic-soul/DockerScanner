@@ -6,12 +6,17 @@ pyproject.toml
 setup.py
 docker_manager/__init__.py
 docker_manager/__pycache__/__init__.cpython-311.pyc
+docker_manager/ai/__init__.py
+docker_manager/ai/recommendation.py
+docker_manager/ai/__pycache__/__init__.cpython-311.pyc
+docker_manager/ai/__pycache__/recommendation.cpython-311.pyc
 docker_manager/core/__init__.py
 docker_manager/core/container_logs.py
 docker_manager/core/container_visualization.py
 docker_manager/core/health_report.py
 docker_manager/core/service_manager.py
 docker_manager/core/__pycache__/__init__.cpython-311.pyc
+docker_manager/core/__pycache__/container_visualization.cpython-311.pyc
 docker_manager/core/__pycache__/health_report.cpython-311.pyc
 docker_manager/core/__pycache__/service_manager.cpython-311.pyc
 docker_manager/templates/__init__.py
@@ -29,6 +34,10 @@ docker_manager/ui/__pycache__/interactive.cpython-311.pyc
 docker_manager/ui/__pycache__/onboarding.cpython-311.pyc
 docker_manager/ui/tui/__init__.py
 docker_manager/ui/tui/main.py
+docker_manager/ui/tui/main_simple.py
+docker_manager/ui/tui/__pycache__/__init__.cpython-311.pyc
+docker_manager/ui/tui/__pycache__/main.cpython-311.pyc
+docker_manager/ui/tui/__pycache__/main_simple.cpython-311.pyc
 docker_manager/utils/__init__.py
 docker_manager/utils/display.py
 docker_manager/utils/system.py
@@ -41,3 +50,4 @@ docker_service_manager.egg-info/dependency_links.txt
 docker_service_manager.egg-info/entry_points.txt
 docker_service_manager.egg-info/requires.txt
 docker_service_manager.egg-info/top_level.txt
+tests/test_service_manager.py
